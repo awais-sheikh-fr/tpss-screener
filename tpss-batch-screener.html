@@ -722,9 +722,9 @@ function dedup(rows) {
   var seen=new Map();
   for (var i=0;i<rows.length;i++) {
     var row=rows[i];
-    var email=(row['Attendee Details /Email']||'').toLowerCase().trim();
-    var vn=(row['Venture Details /Venture Name']||'').toLowerCase().trim();
-    var key=email||vn||('row_'+i); // ← never drop a row silently
+    var email=(row['Email']||'').toLowerCase().trim();
+    var vn=(row['Venture Name']||'').toLowerCase().trim();
+    var key=email||vn||('row_'+i);
     if (!seen.has(key)) { seen.set(key,row); }
     else if (JSON.stringify(row).length>JSON.stringify(seen.get(key)).length) { seen.set(key,row); }
   }
@@ -750,7 +750,7 @@ async function batchScreen(rows, alreadySubmitted) {
     console.warn('[TPSS] WARNING: 0 rows after dedup. Check column names in your sheet match exactly (including spacing around /)');
   }
   for (var i=0;i<rows.length;i++) {
-    var vn=rows[i]['Venture Details /Venture Name']||'Unknown';
+    var vn=rows[i]['Venture Name']||'Unknown';
     var pf=document.getElementById('pf'), pl=document.getElementById('pl');
     if (pf) pf.style.width=Math.round(((i+1)/rows.length)*100)+'%';
     if (pl) pl.textContent='Screening: '+vn+' ('+(i+1)+'/'+rows.length+')';
@@ -775,25 +775,25 @@ async function batchScreen(rows, alreadySubmitted) {
 // ── SCREEN ONE ─────────────────────────────────────────────────
 async function screenOne(row) {
   function g(k){return (row[k]||'').toString().trim();}
-  var vName=g('Venture Details /Venture Name')||'Unknown';
-  var aName=(g('Attendee Details /First Name')+' '+g('Attendee Details /Last Name')).trim();
+  var vName=g('Venture Name')||'Unknown';
+  var aName=(g('First Name')+' '+g('Last Name')).trim();
 
   var prompt='You are a TPSS Accelerator evaluator. Screen this venture for Stage 0 eligibility.\n\n'+
-    'VENTURE: '+vName+' | APPLICANT: '+aName+' | COUNTRY: '+g('Attendee Details /Country')+'\n'+
-    'SECTOR: '+g('Venture Details /Venture Sector')+' | STAGE: '+g('Venture Details /Venture Stage')+' | TYPE: '+g('Venture Details /Venture Type')+'\n'+
-    'DESCRIPTION: '+g('Venture Details /Venture Description')+'\n'+
-    'MISSION: '+g('Venture Details /Venture Mission')+'\n'+
-    'MAQASID: '+g('Venture Details /Maqasid Alignment')+'\n'+
-    'PROBLEM: '+g('Venture Details /Problem Statement')+'\n'+
-    'SOLUTION: '+g('Venture Details /Venture Solution')+'\n'+
-    'DIFFERENTIATION: '+g('Venture Details /Venture Difference')+'\n'+
-    'TRACTION STATUS: '+g('Venture Details /Current Traction')+'\n'+
-    'TRACTION EVIDENCE: '+g('Venture Details /Traction Examples')+'\n'+
-    'TEAM: '+(g('Venture Details /Cofounders')||g('Venture Details /Cofounder Details'))+'\n'+
-    'FUNDING: '+g('Venture Details /Funding Source')+' | ASK: '+g('Venture Details /Funding Amount')+'\n'+
-    'USE OF FUNDS: '+g('Venture Details /Funds Use')+'\n'+
-    'IMPACT: '+g('Venture Details /Venture Impact')+'\n'+
-    'COMMIT TO FINALS: '+g('Venture Details /Commit')+'\n\n'+
+    'VENTURE: '+vName+' | APPLICANT: '+aName+' | COUNTRY: '+g('Country')+'\n'+
+    'SECTOR: '+g('Venture Sector')+' | STAGE: '+g('Venture Stage')+' | TYPE: '+g('Venture Type')+'\n'+
+    'DESCRIPTION: '+g('Venture Description')+'\n'+
+    'MISSION: '+g('Venture Mission')+'\n'+
+    'MAQASID: '+g('Maqasid Alignment')+' | OTHER: '+g('Maqasid Alignment Other')+'\n'+
+    'PROBLEM: '+g('Problem Statement')+'\n'+
+    'SOLUTION: '+g('Venture Solution')+'\n'+
+    'DIFFERENTIATION: '+g('Venture Difference')+'\n'+
+    'TRACTION STATUS: '+g('Current Traction')+'\n'+
+    'TRACTION EVIDENCE: '+g('Traction Examples')+'\n'+
+    'TEAM: '+(g('Cofounders')||g('Cofounder Details'))+'\n'+
+    'FUNDING: '+g('Funding Source')+' | ASK: '+g('Funding Amount')+'\n'+
+    'USE OF FUNDS: '+g('Funds Use')+'\n'+
+    'IMPACT: '+g('Venture Impact')+'\n'+
+    'COMMIT TO FINALS: '+g('Commit')+'\n\n'+
     'Gate criteria — verdict: "pass", "fail", or "flag" (uncertain):\n'+
     '1. stage: Proof-of-concept or stronger? Concept-only=fail unless exceptional.\n'+
     '2. ummah: Explicit Muslim community/Maqasid al-Shariah alignment?\n'+
@@ -835,14 +835,14 @@ async function screenOne(row) {
   var aiScore=calcScore(humanGates,ai.ratings);
 
   return {
-    id:(g('Attendee Details /Email')||vName).toLowerCase().trim(),
-    email:g('Attendee Details /Email'),
+    id:(g('Email')||vName).toLowerCase().trim(),
+    email:g('Email'),
     applicantName:aName, ventureName:vName,
-    country:g('Attendee Details /Country'),
-    sector:g('Venture Details /Venture Sector'),
-    ventureStage:g('Venture Details /Venture Stage'),
-    stream:g('Attendee Details /Stream'),
-    dateApplied:g('Attendee Details /Date Applied'),
+    country:g('Country'),
+    sector:g('Venture Sector'),
+    ventureStage:g('Venture Stage'),
+    stream:g('Stream'),
+    dateApplied:g('Date Applied'),
     aiGates:JSON.parse(JSON.stringify(ai.gates)),
     humanGates:humanGates,
     editedGates:new Set(),
@@ -1122,8 +1122,8 @@ async function checkForUpdates(){
   var rows=dedup(data.rows||[]);
   var existing=new Set(apps.map(function(a){return a.id;}));
   var newRows=rows.filter(function(row){
-    var email=(row['Attendee Details /Email']||'').toLowerCase().trim();
-    var vn=(row['Venture Details /Venture Name']||'').toLowerCase().trim();
+    var email=(row['Email']||'').toLowerCase().trim();
+    var vn=(row['Venture Name']||'').toLowerCase().trim();
     return (email||vn)&&!existing.has(email||vn);
   });
   if (!newRows.length){
