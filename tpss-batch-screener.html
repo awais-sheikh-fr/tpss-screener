@@ -289,6 +289,12 @@ pre.script{font-size:11px;padding:14px;overflow-x:auto;line-height:1.7;color:var
         </div>
       </div>
 
+      <div class="sf">
+        <label>Gemini API Key (for AI screening)</label>
+        <input type="password" id="setupGeminiKey" placeholder="AIza..." />
+        <div class="sf-note">Free at <a href="https://aistudio.google.com" target="_blank" style="color:var(--cyan)">aistudio.google.com</a> → Get API key. Used only in your browser to score applicants.</div>
+      </div>
+
       <div class="test-result" id="testResult"></div>
 
       <button class="btn-setup" id="startBtn" onclick="startApp()">
@@ -554,7 +560,7 @@ const RATINGS=[
 ];
 
 let apps=[], appFilter='all', sortBy='score-desc';
-let scriptUrl='', secretKey='', sheetName='Sheet1';
+let scriptUrl='', secretKey='', sheetName='Sheet1', geminiKey='';
 
 // ── CORE JSONP FETCHER ─────────────────────────────────────────
 // All reads go through this single function using JSONP to bypass CORS.
@@ -614,6 +620,7 @@ function goToSetup() {
   document.getElementById('setupScriptUrl').value=scriptUrl;
   document.getElementById('setupSecretKey').value=secretKey;
   document.getElementById('setupSheetName').value=sheetName;
+  document.getElementById('setupGeminiKey').value=geminiKey;
   document.getElementById('testResult').className='test-result';
 }
 
@@ -671,6 +678,7 @@ async function startApp() {
   var url=document.getElementById('setupScriptUrl').value.trim();
   var key=document.getElementById('setupSecretKey').value.trim();
   var sheet=document.getElementById('setupSheetName').value.trim()||'Sheet1';
+  var gKey=document.getElementById('setupGeminiKey').value.trim();
   var res=document.getElementById('testResult');
 
   if (!url||!key) {
@@ -678,8 +686,13 @@ async function startApp() {
     res.textContent='Please enter the Script URL and secret key.';
     return;
   }
+  if (!gKey) {
+    res.className='test-result err';
+    res.textContent='Please enter your Gemini API key so applicants can be scored.';
+    return;
+  }
 
-  scriptUrl=url; secretKey=key; sheetName=sheet;
+  scriptUrl=url; secretKey=key; sheetName=sheet; geminiKey=gKey;
 
   var btn=document.getElementById('startBtn');
   btn.innerHTML='<span class="mini-spin"></span> Loading applicants…';
@@ -778,44 +791,43 @@ async function screenOne(row) {
   var vName=g('Venture Name')||'Unknown';
   var aName=(g('First Name')+' '+g('Last Name')).trim();
 
-  var prompt='You are a TPSS Accelerator evaluator. Screen this venture for Stage 0 eligibility.\n\n'+
-    'VENTURE: '+vName+' | APPLICANT: '+aName+' | COUNTRY: '+g('Country')+'\n'+
-    'SECTOR: '+g('Venture Sector')+' | STAGE: '+g('Venture Stage')+' | TYPE: '+g('Venture Type')+'\n'+
-    'DESCRIPTION: '+g('Venture Description')+'\n'+
-    'MISSION: '+g('Venture Mission')+'\n'+
-    'MAQASID: '+g('Maqasid Alignment')+' | OTHER: '+g('Maqasid Alignment Other')+'\n'+
-    'PROBLEM: '+g('Problem Statement')+'\n'+
-    'SOLUTION: '+g('Venture Solution')+'\n'+
-    'DIFFERENTIATION: '+g('Venture Difference')+'\n'+
-    'TRACTION STATUS: '+g('Current Traction')+'\n'+
-    'TRACTION EVIDENCE: '+g('Traction Examples')+'\n'+
-    'TEAM: '+(g('Cofounders')||g('Cofounder Details'))+'\n'+
-    'FUNDING: '+g('Funding Source')+' | ASK: '+g('Funding Amount')+'\n'+
-    'USE OF FUNDS: '+g('Funds Use')+'\n'+
-    'IMPACT: '+g('Venture Impact')+'\n'+
-    'COMMIT TO FINALS: '+g('Commit')+'\n\n'+
-    'Gate criteria — verdict: "pass", "fail", or "flag" (uncertain):\n'+
-    '1. stage: Proof-of-concept or stronger? Concept-only=fail unless exceptional.\n'+
-    '2. ummah: Explicit Muslim community/Maqasid al-Shariah alignment?\n'+
-    '3. compliance: No haram sectors, no riba-dependent revenue?\n'+
-    '4. team: Named founders, verifiable backgrounds, clear roles?\n'+
-    '5. viability: Credible problem-solution fit, coherent funding ask?\n'+
-    '6. availability: Confirmed for coaching & TPSS 2026 finals?\n\n'+
-    'Return ONLY valid JSON, no markdown:\n'+
+  // Compact prompt to stay within GET URL length limits (~6KB safe zone)
+  var prompt='TPSS Stage 0 screener. Return ONLY valid JSON, no markdown.\n'+
+    'VENTURE:'+vName+' APPLICANT:'+aName+' COUNTRY:'+g('Country')+'\n'+
+    'SECTOR:'+g('Venture Sector')+' STAGE:'+g('Venture Stage')+' TYPE:'+g('Venture Type')+'\n'+
+    'DESC:'+g('Venture Description').slice(0,300)+'\n'+
+    'MISSION:'+g('Venture Mission').slice(0,200)+'\n'+
+    'MAQASID:'+g('Maqasid Alignment')+'\n'+
+    'PROBLEM:'+g('Problem Statement').slice(0,200)+'\n'+
+    'SOLUTION:'+g('Venture Solution').slice(0,200)+'\n'+
+    'TRACTION:'+g('Current Traction')+' '+g('Traction Examples').slice(0,150)+'\n'+
+    'TEAM:'+(g('Cofounders')||g('Cofounder Details')).slice(0,150)+'\n'+
+    'FUNDING:'+g('Funding Source')+' ASK:'+g('Funding Amount')+'\n'+
+    'COMMIT:'+g('Commit')+'\n'+
+    'Gates — verdict pass/fail/flag:\n'+
+    '1.stage: PoC or stronger? 2.ummah: Muslim/Maqasid alignment? 3.compliance: No haram/riba? 4.team: Named founders? 5.viability: Credible fit+ask? 6.availability: Confirmed for finals?\n'+
     '{"gates":{"stage":{"verdict":"pass|fail|flag","note":"1 sentence"},"ummah":{"verdict":"pass|fail|flag","note":"1 sentence"},"compliance":{"verdict":"pass|fail|flag","note":"1 sentence"},"team":{"verdict":"pass|fail|flag","note":"1 sentence"},"viability":{"verdict":"pass|fail|flag","note":"1 sentence"},"availability":{"verdict":"pass|fail|flag","note":"1 sentence"}},"ratings":{"ummah":3,"stage":3,"team":3,"viability":3},"summary":"2-sentence impression"}';
 
   var ai;
   try {
-    // Screening uses JSONP GET (same pattern as data loading) to bypass
-    // Apps Script's inability to set CORS headers on POST responses.
-    var screenUrl = scriptUrl +
-      '?key=' + encodeURIComponent(secretKey) +
-      '&action=screen' +
-      '&prompt=' + encodeURIComponent(prompt);
-    var data = await jsonpFetch(screenUrl, 45000);
-    if (!data.ok) throw new Error(data.error || 'Screening failed');
-    ai = data.result;
+    if (!geminiKey) throw new Error('No Gemini API key configured');
+    var resp = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + encodeURIComponent(geminiKey),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 1000 }
+        })
+      }
+    );
+    var data = await resp.json();
+    if (data.error) throw new Error(data.error.message);
+    var raw = data.candidates[0].content.parts[0].text || '';
+    ai = JSON.parse(raw.replace(/```json|```/g, '').trim());
   } catch(err) {
+    console.error('[TPSS] Screening failed for', vName, ':', err.message);
     ai={
       gates:{
         stage:{verdict:'flag',note:'AI analysis failed — review manually.'},
