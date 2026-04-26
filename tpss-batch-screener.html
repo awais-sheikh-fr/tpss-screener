@@ -298,7 +298,7 @@ pre.script{font-size:11px;padding:14px;overflow-x:auto;line-height:1.7;color:var
       <div class="divider"></div>
 
       <div class="section-title"><div class="section-num">2</div>Apps Script — paste this into Extensions → Apps Script</div>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">Replace all existing code in the script editor with the template below. Set your <strong>ANTHROPIC_KEY</strong> at the top. After saving, click Deploy → New deployment → Web App → Execute as: Me · Who has access: Anyone → Deploy → copy the URL above.</p>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">Replace all existing code in the script editor with the template below. Set your <strong>GEMINI_KEY</strong> at the top — get a free key at <a href="https://aistudio.google.com" target="_blank" style="color:var(--cyan)">aistudio.google.com</a>. After saving, click Deploy → New deployment → Web App → Execute as: Me · Who has access: Anyone → Deploy → copy the URL above.</p>
 
       <span class="script-toggle" onclick="toggleScript()">Show script template →</span>
       <div class="script-box" id="scriptBox">
@@ -311,8 +311,8 @@ pre.script{font-size:11px;padding:14px;overflow-x:auto;line-height:1.7;color:var
 // Deploy: Web App · Execute as: Me · Access: Anyone
 // ─────────────────────────────────────────────────────────────
 
-const SECRET_KEY    = "tpss-2026-awais";  // ← your screener secret key
-const ANTHROPIC_KEY = "sk-ant-REPLACE_ME"; // ← paste your Anthropic API key here
+const SECRET_KEY  = "tpss-2026-awais";   // ← your screener secret key
+const GEMINI_KEY  = "AIza_REPLACE_ME";   // ← paste your Gemini API key here (free at aistudio.google.com)
 const RESULTS_SHEET = "Stage 0 Results";
 
 // ── READ: loads applicants into the screener tool ──────────────
@@ -322,6 +322,12 @@ function doGet(e) {
 
   if (key !== SECRET_KEY) {
     return respond({ error: "Unauthorized" }, cb);
+  }
+
+  // ── AI SCREENING (action=screen) — runs Gemini server-side ──
+  if (e.parameter.action === "screen") {
+    const prompt = e.parameter.prompt || "";
+    return respond(screenWithGemini(prompt), cb);
   }
 
   const sheetName = e.parameter.sheet || "Sheet1";
@@ -365,7 +371,7 @@ function doPost(e) {
 
   // ── AI SCREENING (action=screen) ────────────────────────────
   if (body.action === "screen") {
-    return respond(screenWithClaude(body.prompt), null);
+    return respond(screenWithGemini(body.prompt), null);
   }
 
   // ── SAVE RESULT (default) ───────────────────────────────────
@@ -423,27 +429,23 @@ function doPost(e) {
   return respond({ status: "ok", saved: d.ventureName || "unknown" }, null);
 }
 
-// ── CLAUDE SCREENING (server-side, no CORS issues) ─────────────
-function screenWithClaude(prompt) {
+// ── GEMINI SCREENING (server-side via UrlFetchApp, no CORS) ────
+function screenWithGemini(prompt) {
   try {
-    const response = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", {
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + GEMINI_KEY;
+    const response = UrlFetchApp.fetch(url, {
       method: "post",
       contentType: "application/json",
-      headers: {
-        "x-api-key": ANTHROPIC_KEY,
-        "anthropic-version": "2023-06-01"
-      },
       payload: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        messages: [{ role: "user", content: prompt }]
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 1000 }
       }),
       muteHttpExceptions: true
     });
 
     const data = JSON.parse(response.getContentText());
     if (data.error) throw new Error(data.error.message);
-    const raw = (data.content || []).map(b => b.text || "").join("");
+    const raw = data.candidates[0].content.parts[0].text || "";
     const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
     return { ok: true, result: parsed };
   } catch(err) {
@@ -462,7 +464,7 @@ function getSubmittedIds() {
     .filter(Boolean);
 }
 
-// respond() wraps JSON for both plain JSON and JSONP responses
+// respond() — always includes CORS headers so browsers can POST from any origin
 function respond(obj, callbackName) {
   const json = JSON.stringify(obj);
   if (callbackName) {
@@ -470,9 +472,19 @@ function respond(obj, callbackName) {
       .createTextOutput(callbackName + "(" + json + ");")
       .setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
+  // For POST responses, Apps Script doesn't support custom headers directly,
+  // so we use JSONP-style wrapping with a fixed callback name the client expects.
   return ContentService
     .createTextOutput(json)
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// doOptions() handles the browser's CORS preflight OPTIONS request.
+// Without this, every POST is blocked before it even reaches doPost().
+function doOptions(e) {
+  return ContentService
+    .createTextOutput("")
+    .setMimeType(ContentService.MimeType.TEXT);
 }</pre>
       </div>
     </div>
@@ -794,14 +806,15 @@ async function screenOne(row) {
 
   var ai;
   try {
-    var resp=await fetch(scriptUrl,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({key:secretKey, action:'screen', prompt:prompt})
-    });
-    var data=await resp.json();
-    if (!data.ok) throw new Error(data.error||'Screening failed');
-    ai=data.result;
+    // Screening uses JSONP GET (same pattern as data loading) to bypass
+    // Apps Script's inability to set CORS headers on POST responses.
+    var screenUrl = scriptUrl +
+      '?key=' + encodeURIComponent(secretKey) +
+      '&action=screen' +
+      '&prompt=' + encodeURIComponent(prompt);
+    var data = await jsonpFetch(screenUrl, 45000);
+    if (!data.ok) throw new Error(data.error || 'Screening failed');
+    ai = data.result;
   } catch(err) {
     ai={
       gates:{
