@@ -836,6 +836,7 @@ async function screenOne(row) {
     cleaned = cleaned.slice(start, end + 1);
     // Remove control characters that break JSON parsing
     cleaned = cleaned.replace(/[\x00-\x1F\x7F]/g, ' ');
+    console.log('[TPSS] Raw JSON for', vName, ':', cleaned);
     ai = JSON.parse(cleaned);
   } catch(err) {
     console.error('[TPSS] Screening failed for', vName, ':', err.message);
