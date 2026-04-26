@@ -787,7 +787,8 @@ async function batchScreen(rows, alreadySubmitted) {
 
 // ── SCREEN ONE ─────────────────────────────────────────────────
 async function screenOne(row) {
-  function g(k){return (row[k]||'').toString().trim();}
+  // Strip characters that can break JSON parsing in AI responses
+  function g(k){ return (row[k]||'').toString().trim().replace(/[\r\n]+/g,' ').replace(/"/g,"'"); }
   var vName=g('Venture Name')||'Unknown';
   var aName=(g('First Name')+' '+g('Last Name')).trim();
 
@@ -825,7 +826,13 @@ async function screenOne(row) {
     var data = await resp.json();
     if (data.error) throw new Error(data.error.message);
     var raw = data.candidates[0].content.parts[0].text || '';
-    ai = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    // Clean up common JSON-breaking issues from AI responses
+    var cleaned = raw
+      .replace(/```json|```/g, '')  // strip markdown fences
+      .trim()
+      // Find just the JSON object if there's surrounding text
+      .replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
+    ai = JSON.parse(cleaned);
   } catch(err) {
     console.error('[TPSS] Screening failed for', vName, ':', err.message);
     ai={
