@@ -793,7 +793,7 @@ async function screenOne(row) {
   var aName=(g('First Name')+' '+g('Last Name')).trim();
 
   // Compact prompt to stay within GET URL length limits (~6KB safe zone)
-  var prompt='TPSS Stage 0 screener. Return ONLY valid JSON, no markdown.\n'+
+  var prompt='TPSS Stage 0 screener. Return ONLY valid JSON, no markdown, no special characters in strings, no apostrophes, use simple words only.\n'+
     'VENTURE:'+vName+' APPLICANT:'+aName+' COUNTRY:'+g('Country')+'\n'+
     'SECTOR:'+g('Venture Sector')+' STAGE:'+g('Venture Stage')+' TYPE:'+g('Venture Type')+'\n'+
     'DESC:'+g('Venture Description').slice(0,300)+'\n'+
@@ -805,9 +805,10 @@ async function screenOne(row) {
     'TEAM:'+(g('Cofounders')||g('Cofounder Details')).slice(0,150)+'\n'+
     'FUNDING:'+g('Funding Source')+' ASK:'+g('Funding Amount')+'\n'+
     'COMMIT:'+g('Commit')+'\n'+
-    'Gates — verdict pass/fail/flag:\n'+
-    '1.stage: PoC or stronger? 2.ummah: Muslim/Maqasid alignment? 3.compliance: No haram/riba? 4.team: Named founders? 5.viability: Credible fit+ask? 6.availability: Confirmed for finals?\n'+
-    '{"gates":{"stage":{"verdict":"pass|fail|flag","note":"1 sentence"},"ummah":{"verdict":"pass|fail|flag","note":"1 sentence"},"compliance":{"verdict":"pass|fail|flag","note":"1 sentence"},"team":{"verdict":"pass|fail|flag","note":"1 sentence"},"viability":{"verdict":"pass|fail|flag","note":"1 sentence"},"availability":{"verdict":"pass|fail|flag","note":"1 sentence"}},"ratings":{"ummah":3,"stage":3,"team":3,"viability":3},"summary":"2-sentence impression"}';
+    'Gates verdict pass/fail/flag:\n'+
+    '1.stage: PoC or stronger? 2.ummah: Muslim/Maqasid alignment? 3.compliance: No haram/riba? 4.team: Named founders? 5.viability: Credible fit and ask? 6.availability: Confirmed for finals?\n'+
+    'Return this exact JSON structure with short plain notes (no apostrophes, no quotes inside strings):\n'+
+    '{"gates":{"stage":{"verdict":"pass","note":"one sentence"},"ummah":{"verdict":"pass","note":"one sentence"},"compliance":{"verdict":"pass","note":"one sentence"},"team":{"verdict":"pass","note":"one sentence"},"viability":{"verdict":"pass","note":"one sentence"},"availability":{"verdict":"pass","note":"one sentence"}},"ratings":{"ummah":3,"stage":3,"team":3,"viability":3},"summary":"two sentence plain text summary"}';
 
   var ai;
   try {
@@ -826,12 +827,15 @@ async function screenOne(row) {
     var data = await resp.json();
     if (data.error) throw new Error(data.error.message);
     var raw = data.candidates[0].content.parts[0].text || '';
-    // Clean up common JSON-breaking issues from AI responses
-    var cleaned = raw
-      .replace(/```json|```/g, '')  // strip markdown fences
-      .trim()
-      // Find just the JSON object if there's surrounding text
-      .replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
+    // Extract just the JSON object, then aggressively clean string values
+    var cleaned = raw.replace(/```json|```/g, '').trim();
+    // Extract from first { to last }
+    var start = cleaned.indexOf('{');
+    var end = cleaned.lastIndexOf('}');
+    if (start === -1 || end === -1) throw new Error('No JSON object found in response');
+    cleaned = cleaned.slice(start, end + 1);
+    // Remove control characters that break JSON parsing
+    cleaned = cleaned.replace(/[\x00-\x1F\x7F]/g, ' ');
     ai = JSON.parse(cleaned);
   } catch(err) {
     console.error('[TPSS] Screening failed for', vName, ':', err.message);
