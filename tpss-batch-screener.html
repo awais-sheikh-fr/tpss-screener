@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TPSS Accelerator — Stage 0 Batch Screener</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1a2e5a;--navy-deep:#0f1e3d;--navy-mid:#243c73;
+  --cyan:#00aeef;--cyan-pale:#e3f6fd;--cyan-mid:#9adcf5;
+  --bg:#eef1f8;--surface:#fff;--surface2:#f6f8fd;
+  --border:#dce3f0;--border2:#c5d0e6;
+  --text:#1a2e5a;--text2:#4a5e82;--text3:#7a8fac;
+  --pass-text:#27500a;--pass-bg:#eaf3de;--pass-border:#86efac;
+  --fail-text:#791f1f;--fail-bg:#fcebeb;--fail-border:#fca5a5;
+  --flag-text:#633806;--flag-bg:#fffbeb;--flag-border:#fcd34d;
+  --r:10px;--r-sm:6px;--r-lg:14px;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;min-height:100vh}
+.hdr{background:var(--navy-deep);padding:0 20px;display:flex;align-items:center;gap:14px;height:54px;border-bottom:2px solid var(--cyan);position:sticky;top:0;z-index:200}
+.hdr-logo{width:32px;height:32px;border-radius:50%;background:var(--cyan);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.hdr-logo svg{width:18px;height:18px}
+.hdr-brand{font-family:'Montserrat',sans-serif;font-size:13px;font-weight:700;color:#fff;letter-spacing:.05em;text-transform:uppercase}
+.hdr-brand span{color:var(--cyan)}
+.hdr-div{width:1px;height:20px;background:rgba(255,255,255,.15)}
+.hdr-title{font-size:12px;color:rgba(255,255,255,.6)}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.phase{font-size:11px;font-weight:600;padding:3px 11px;border-radius:20px;font-family:'Montserrat',sans-serif;letter-spacing:.02em}
+.phase.done{background:#eaf3de;color:#27500a}
+.phase.active{background:var(--cyan);color:#fff}
+.phase.idle{background:rgba(255,255,255,.1);color:rgba(255,255,255,.4)}
+.config-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:9px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.config-label{font-size:12px;color:var(--text2);font-weight:500;white-space:nowrap}
+.btn{font-size:12px;font-weight:600;padding:7px 16px;border-radius:var(--r-sm);cursor:pointer;transition:all .15s;font-family:'Montserrat',sans-serif;letter-spacing:.03em;white-space:nowrap;border:none}
+.btn-primary{background:var(--navy);color:#fff}
+.btn-primary:hover{background:var(--navy-mid)}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed}
+.btn-sec{background:var(--surface);color:var(--text2);border:1px solid var(--border2)}
+.btn-sec:hover{border-color:var(--navy);color:var(--navy)}
+.conn-ok{font-size:11px;font-weight:500;color:var(--pass-text)}
+.conn-err{font-size:11px;font-weight:500;color:var(--fail-text)}
+.conn-chk{font-size:11px;color:var(--text3)}
+.summary{display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface2);border-bottom:1px solid var(--border)}
+.sstat{padding:10px 14px;text-align:center;border-right:1px solid var(--border)}
+.sstat:last-child{border-right:none}
+.sstat .val{font-size:22px;font-weight:600;color:var(--text);font-family:'Montserrat',sans-serif}
+.sstat .lbl{font-size:11px;color:var(--text3);font-weight:500}
+.sstat.adv .val{color:var(--pass-text)}
+.sstat.rev .val{color:var(--flag-text)}
+.sstat.rej .val{color:var(--fail-text)}
+.sstat.sub .val{color:var(--cyan)}
+.filter-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:9px 20px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.flbl{font-size:12px;color:var(--text3);font-weight:500}
+.fpill{font-size:11px;font-weight:600;padding:4px 13px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;font-family:'Montserrat',sans-serif;letter-spacing:.02em;transition:all .12s}
+.fpill:hover{border-color:var(--navy);color:var(--navy)}
+.fpill.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.sort-sel{font-size:12px;padding:5px 9px;border-radius:var(--r-sm);border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif}
+.refresh-btn{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:5px 12px;border-radius:var(--r-sm);border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;font-family:'Montserrat',sans-serif;letter-spacing:.02em;transition:all .15s}
+.refresh-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.refresh-btn svg{width:12px;height:12px;transition:transform .4s}
+.refresh-btn.spinning svg{animation:spin .7s linear infinite}
+.new-badge{font-size:10px;background:var(--cyan);color:#fff;padding:1px 6px;border-radius:20px;font-weight:700}
+@keyframes spin{to{transform:rotate(360deg)}}
+.main{max-width:1000px;margin:0 auto;padding:20px}
+.loading-wrap{text-align:center;padding:56px 20px}
+.loading-wrap h2{font-family:'Montserrat',sans-serif;font-size:18px;font-weight:800;color:var(--navy);margin-bottom:6px}
+.loading-wrap p{font-size:13px;color:var(--text2);margin-bottom:20px}
+.prog-bar{width:320px;height:6px;background:var(--border);border-radius:3px;margin:0 auto 8px;overflow:hidden}
+.prog-fill{height:100%;background:var(--cyan);border-radius:3px;transition:width .3s ease;width:0%}
+.prog-lbl{font-size:12px;color:var(--text3)}
+.spin-lg{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--cyan);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
+.app-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:12px;overflow:hidden;transition:box-shadow .2s}
+.app-card:hover{box-shadow:0 4px 16px rgba(26,46,90,.08)}
+.app-card.submitted{border-color:var(--pass-border)}
+.card-top{padding:14px 16px}
+.row1{display:flex;align-items:flex-start;gap:12px;margin-bottom:11px}
+.avatar{width:38px;height:38px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;font-family:'Montserrat',sans-serif}
+.av-b{background:#e6f1fb;color:#0c447c}
+.av-t{background:#e1f5ee;color:#085041}
+.av-p{background:#eeedfe;color:#3c3489}
+.av-c{background:#faece7;color:#712b13}
+.av-g{background:#f1efea;color:#444441}
+.app-info{flex:1;min-width:0}
+.app-name{font-size:15px;font-weight:500;color:var(--text)}
+.app-sub{font-size:12px;color:var(--text2);margin-top:1px}
+.tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.tag{font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;font-family:'Montserrat',sans-serif;letter-spacing:.02em}
+.t-edu{background:#e6f1fb;color:#185fa5}
+.t-npo{background:#e1f5ee;color:#0f6e56}
+.t-fp{background:#faeeda;color:#854f0b}
+.t-sec{background:#f1efea;color:#5f5e5a}
+.score-row{display:flex;gap:10px;align-items:flex-start}
+.gates-grid{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.gate-chip{padding:6px 8px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface2)}
+.gc-top{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:3px}
+.gc-name{font-size:10px;color:var(--text2);font-weight:600;font-family:'Montserrat',sans-serif;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:76px}
+.gbadge{font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;flex-shrink:0;font-family:'Montserrat',sans-serif;letter-spacing:.02em}
+.gbadge.p{background:var(--pass-bg);color:var(--pass-text)}
+.gbadge.f{background:var(--fail-bg);color:var(--fail-text)}
+.gbadge.fl{background:var(--flag-bg);color:var(--flag-text)}
+.gc-note{font-size:10px;color:var(--text3);line-height:1.4;font-style:italic}
+.score-col{width:70px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:3px}
+.cscore{font-size:32px;font-weight:700;line-height:1;font-family:'Montserrat',sans-serif}
+.cscore.hi{color:var(--pass-text)}
+.cscore.md{color:var(--flag-text)}
+.cscore.lo{color:var(--fail-text)}
+.cscore-lbl{font-size:10px;color:var(--text3);text-align:center;font-weight:500}
+.sbar{width:58px;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.sfill{height:100%;border-radius:3px;transition:width .4s}
+.sfill.hi{background:#639922}
+.sfill.md{background:#d97706}
+.sfill.lo{background:#dc2626}
+.card-footer{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-top:1px solid var(--border);background:var(--surface2);gap:10px;flex-wrap:wrap}
+.cf-left{display:flex;align-items:center;gap:7px;flex:1;min-width:0}
+.ai-tag{font-size:10px;background:var(--cyan-pale);color:#185fa5;padding:2px 8px;border-radius:20px;font-weight:700;font-family:'Montserrat',sans-serif;flex-shrink:0}
+.ai-summary{font-size:11px;color:var(--text2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px}
+.cf-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.assign-disp{font-size:11px;color:var(--text3)}
+.assign-disp strong{color:var(--text);font-weight:500}
+.vbadge{font-size:11px;font-weight:700;padding:4px 13px;border-radius:20px;font-family:'Montserrat',sans-serif;letter-spacing:.02em}
+.vb-adv{background:var(--pass-bg);color:var(--pass-text);border:1px solid var(--pass-border)}
+.vb-rev{background:var(--flag-bg);color:var(--flag-text);border:1px solid var(--flag-border)}
+.vb-rej{background:var(--fail-bg);color:var(--fail-text);border:1px solid var(--fail-border)}
+.vb-sub{background:var(--cyan-pale);color:#185fa5;border:1px solid var(--cyan-mid)}
+.rev-btn{font-size:11px;font-weight:600;padding:4px 12px;border-radius:var(--r-sm);border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;font-family:'Montserrat',sans-serif;letter-spacing:.02em;transition:all .12s}
+.rev-btn:hover{border-color:var(--navy);color:var(--navy)}
+.rev-btn.open{border-color:var(--navy);color:var(--navy);background:#f0f4fc}
+.sub-banner{background:var(--pass-bg);border-top:1px solid var(--pass-border);padding:7px 16px;font-size:11px;font-weight:600;color:var(--pass-text);font-family:'Montserrat',sans-serif;letter-spacing:.03em}
+.expand-panel{border-top:1px solid var(--border);padding:16px}
+.ep-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+.ep-title{font-size:13px;font-weight:700;color:var(--navy);font-family:'Montserrat',sans-serif}
+.assign-sec{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.assign-lbl{font-size:11px;color:var(--text2);font-weight:500}
+.member-chips{display:flex;gap:4px;flex-wrap:wrap}
+.mchip{font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;font-family:'Montserrat',sans-serif;letter-spacing:.02em;transition:all .12s}
+.mchip:hover{border-color:var(--navy);color:var(--navy)}
+.mchip.sel{background:var(--navy);color:#fff;border-color:var(--navy)}
+.ep-verdict{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--r-sm);margin-bottom:14px;flex-wrap:wrap}
+.ep-verdict.adv{background:var(--pass-bg);border:1px solid var(--pass-border)}
+.ep-verdict.rev{background:var(--flag-bg);border:1px solid var(--flag-border)}
+.ep-verdict.rej{background:var(--fail-bg);border:1px solid var(--fail-border)}
+.epv-lbl{font-size:12px;font-weight:700;font-family:'Montserrat',sans-serif}
+.epv-lbl.adv{color:var(--pass-text)}
+.epv-lbl.rev{color:var(--flag-text)}
+.epv-lbl.rej{color:var(--fail-text)}
+.epv-score{font-size:11px;color:var(--text2);margin-left:auto}
+.ep-sec{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;font-family:'Montserrat',sans-serif;margin-bottom:9px}
+.ep-gates{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.ep-gate{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px}
+.ep-gate.edited{border-color:var(--flag-border)}
+.epg-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:6px;flex-wrap:wrap}
+.epg-name{font-size:12px;font-weight:600;color:var(--text);font-family:'Montserrat',sans-serif}
+.pill-grp{display:flex;gap:3px}
+.epill{font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;font-family:'Montserrat',sans-serif;letter-spacing:.02em;transition:all .12s}
+.epill:hover{border-color:var(--navy);color:var(--navy)}
+.epill.sp{background:var(--pass-bg);border-color:var(--pass-border);color:var(--pass-text)}
+.epill.sf{background:var(--fail-bg);border-color:var(--fail-border);color:var(--fail-text)}
+.epill.sfl{background:var(--flag-bg);border-color:var(--flag-border);color:var(--flag-text)}
+.epg-note{font-size:11px;color:var(--text3);line-height:1.5;font-style:italic;margin-bottom:4px}
+.edited-flag{font-size:10px;color:var(--flag-text);font-weight:600;font-family:'Montserrat',sans-serif}
+.ep-ratings{margin-bottom:16px}
+.rat-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap}
+.rlbl{font-size:12px;color:var(--text2);width:130px;flex-shrink:0;font-weight:500}
+.stars{display:flex;gap:3px}
+.star{width:22px;height:22px;border-radius:5px;border:1px solid var(--border2);background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text3);cursor:pointer;font-family:'Montserrat',sans-serif;transition:all .1s}
+.star:hover{border-color:var(--navy);color:var(--navy)}
+.star.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.rat-ai{font-size:10px;color:var(--text3);margin-left:4px}
+.rat-ai.adj{color:var(--flag-text);font-weight:600}
+.ep-nl{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;font-family:'Montserrat',sans-serif;margin-bottom:6px}
+.ep-notes{width:100%;font-size:13px;min-height:60px;resize:vertical;border:1px solid var(--border2);border-radius:var(--r-sm);padding:8px 11px;background:var(--surface);color:var(--text);font-family:'DM Sans',sans-serif;outline:none;transition:border-color .15s}
+.ep-notes:focus{border-color:var(--cyan)}
+.ep-actions{display:flex;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap;gap:10px}
+.ep-act-l{font-size:11px;color:var(--text3)}
+.ep-act-r{display:flex;gap:8px}
+.btn-submit-card{font-size:12px;font-weight:700;padding:8px 20px;border-radius:var(--r-sm);border:none;background:var(--cyan);color:#fff;cursor:pointer;font-family:'Montserrat',sans-serif;letter-spacing:.03em;transition:all .15s;display:flex;align-items:center;gap:7px}
+.btn-submit-card:hover{background:#0096ce}
+.btn-submit-card:disabled{opacity:.45;cursor:not-allowed}
+.btn-save-card{font-size:12px;font-weight:600;padding:8px 16px;border-radius:var(--r-sm);border:1px solid var(--navy);background:var(--surface);color:var(--navy);cursor:pointer;font-family:'Montserrat',sans-serif;letter-spacing:.03em;transition:all .15s}
+.btn-save-card:hover{background:var(--navy);color:#fff}
+.empty-state{text-align:center;padding:48px 20px}
+.empty-state h3{font-family:'Montserrat',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px;color:var(--navy)}
+.empty-state p{font-size:13px;color:var(--text2)}
+.toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:var(--r);font-size:13px;font-weight:500;z-index:999;transform:translateY(80px);opacity:0;transition:all .25s;max-width:360px;line-height:1.5}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{background:var(--pass-text);color:#fff}
+.toast.error{background:var(--fail-text);color:#fff}
+.toast.info{background:var(--navy);color:#fff}
+.toast.warning{background:var(--flag-text);color:#fff}
+.mini-spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+.setup-wrap{max-width:600px;margin:40px auto}
+.setup-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:32px}
+.setup-logo{width:52px;height:52px;border-radius:50%;background:var(--cyan);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.setup-logo svg{width:28px;height:28px}
+.setup-card h2{font-family:'Montserrat',sans-serif;font-size:20px;font-weight:800;color:var(--navy);margin-bottom:6px;text-align:center}
+.setup-card .sub{font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.6;text-align:center}
+.sf{margin-bottom:16px}
+.sf label{display:block;font-size:11px;font-weight:700;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;font-family:'Montserrat',sans-serif}
+.sf input{width:100%;font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:var(--r-sm);background:var(--surface);color:var(--text);font-family:'DM Sans',sans-serif;outline:none;transition:border-color .15s}
+.sf input:focus{border-color:var(--cyan)}
+.sf input[type=password]{letter-spacing:.1em}
+.sf-note{font-size:11px;color:var(--text3);margin-top:5px;line-height:1.5}
+.sf-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn-setup{width:100%;font-size:13px;font-weight:700;padding:11px;border-radius:var(--r-sm);border:none;background:var(--navy);color:#fff;cursor:pointer;font-family:'Montserrat',sans-serif;letter-spacing:.04em;margin-top:4px;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-setup:hover{background:var(--navy-mid)}
+.btn-setup:disabled{opacity:.5;cursor:not-allowed}
+.test-row{display:flex;gap:8px;align-items:flex-end;margin-bottom:4px}
+.test-row .sf{flex:1;margin:0}
+.btn-test{font-size:12px;font-weight:600;padding:9px 16px;border-radius:var(--r-sm);border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;font-family:'Montserrat',sans-serif;transition:all .15s;white-space:nowrap}
+.btn-test:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn-test:disabled{opacity:.5;cursor:not-allowed}
+.test-result{font-size:12px;font-weight:500;margin-top:8px;margin-bottom:16px;min-height:18px;padding:6px 10px;border-radius:var(--r-sm);display:none}
+.test-result.ok{color:var(--pass-text);background:var(--pass-bg);border:1px solid var(--pass-border);display:block}
+.test-result.err{color:var(--fail-text);background:var(--fail-bg);border:1px solid var(--fail-border);display:block}
+.test-result.chk{color:var(--text2);background:var(--surface2);border:1px solid var(--border);display:block}
+.divider{height:1px;background:var(--border);margin:24px 0}
+.section-title{font-size:13px;font-weight:700;color:var(--navy);font-family:'Montserrat',sans-serif;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-num{width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Montserrat',sans-serif}
+.security-note{background:var(--cyan-pale);border:1px solid var(--cyan-mid);border-radius:var(--r-sm);padding:10px 14px;font-size:12px;color:#185fa5;line-height:1.6;margin-bottom:16px}
+.security-note strong{font-weight:700}
+.script-toggle{font-size:12px;color:var(--cyan);cursor:pointer;font-weight:600;display:inline-block;margin-top:8px}
+.script-box{display:none;margin-top:10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden}
+.script-header{padding:8px 12px;background:var(--navy-deep);display:flex;align-items:center;justify-content:space-between}
+.script-header span{font-size:11px;color:rgba(255,255,255,.7);font-family:'Montserrat',sans-serif;font-weight:600;letter-spacing:.04em}
+.copy-btn{font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.8);cursor:pointer;font-family:'Montserrat',sans-serif;transition:all .15s}
+.copy-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+pre.script{font-size:11px;padding:14px;overflow-x:auto;line-height:1.7;color:var(--text2);white-space:pre;margin:0}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-logo">
+    <svg viewBox="0 0 18 18" fill="none">
+      <circle cx="9" cy="6.5" r="3.5" fill="white"/>
+      <path d="M2 17c0-3.866 3.134-7 7-7s7 3.134 7 7" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <span class="hdr-brand">TPSS <span>Accelerator</span></span>
+  <div class="hdr-div"></div>
+  <span class="hdr-title">Stage 0 — Batch Screener</span>
+  <div class="hdr-right" id="phaseBar" style="display:none">
+    <span class="phase done" id="ph1">AI scored</span>
+    <span class="phase active" id="ph2">Human review</span>
+    <span class="phase idle" id="ph3">Submitting</span>
+  </div>
+</header>
+
+<!-- SETUP -->
+<div id="setupScreen" class="main">
+  <div class="setup-wrap">
+    <div class="setup-card">
+      <div class="setup-logo">
+        <svg viewBox="0 0 28 28" fill="none">
+          <circle cx="14" cy="10" r="5" fill="white"/>
+          <path d="M3 26c0-6.075 4.925-11 11-11s11 4.925 11 11" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h2>TPSS Stage 0 Screener</h2>
+      <p class="sub">Your Google Sheet stays private — never published. All data flows through your own Apps Script with a secret key.</p>
+
+      <div class="security-note">
+        <strong>Secure by design:</strong> Your sheet is never made public. The Apps Script acts as a private API — requests without your secret key are rejected immediately. Data never leaves your Google account.
+      </div>
+
+      <div class="section-title"><div class="section-num">1</div>Connect your Apps Script</div>
+
+      <div class="test-row">
+        <div class="sf">
+          <label>Apps Script Web App URL</label>
+          <input type="url" id="setupScriptUrl" placeholder="https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec" />
+          <div class="sf-note">In your sheet: Extensions → Apps Script → Deploy → New deployment → Web App → Execute as: Me · Access: Anyone → copy the URL.</div>
+        </div>
+        <button class="btn-test" id="testBtn" onclick="testConnection()">Test</button>
+      </div>
+
+      <div class="sf-row">
+        <div class="sf">
+          <label>Secret key</label>
+          <input type="password" id="setupSecretKey" placeholder="e.g. tpss-2026-awais" />
+          <div class="sf-note">Must match the SECRET_KEY in your Apps Script exactly.</div>
+        </div>
+        <div class="sf">
+          <label>Sheet tab name</label>
+          <input type="text" id="setupSheetName" placeholder="Sheet1" value="Sheet1" />
+          <div class="sf-note">Exact name of the tab with applicant data.</div>
+        </div>
+      </div>
+
+      <div class="test-result" id="testResult"></div>
+
+      <button class="btn-setup" id="startBtn" onclick="startApp()">
+        Connect &amp; load applicants →
+      </button>
+
+      <div class="divider"></div>
+
+      <div class="section-title"><div class="section-num">2</div>Apps Script — paste this into Extensions → Apps Script</div>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">Replace all existing code in the script editor with the template below. Set your <strong>ANTHROPIC_KEY</strong> at the top. After saving, click Deploy → New deployment → Web App → Execute as: Me · Who has access: Anyone → Deploy → copy the URL above.</p>
+
+      <span class="script-toggle" onclick="toggleScript()">Show script template →</span>
+      <div class="script-box" id="scriptBox">
+        <div class="script-header">
+          <span>CODE.GS — REPLACE ALL EXISTING CODE WITH THIS</span>
+          <button class="copy-btn" onclick="copyScript()">Copy</button>
+        </div>
+        <pre class="script" id="scriptCode">// ─────────────────────────────────────────────────────────────
+// TPSS Stage 0 Screener — Apps Script
+// Deploy: Web App · Execute as: Me · Access: Anyone
+// ─────────────────────────────────────────────────────────────
+
+const SECRET_KEY    = "tpss-2026-awais";  // ← your screener secret key
+const ANTHROPIC_KEY = "sk-ant-REPLACE_ME"; // ← paste your Anthropic API key here
+const RESULTS_SHEET = "Stage 0 Results";
+
+// ── READ: loads applicants into the screener tool ──────────────
+function doGet(e) {
+  const key = e.parameter.key;
+  const cb  = e.parameter.callback;   // JSONP callback name
+
+  if (key !== SECRET_KEY) {
+    return respond({ error: "Unauthorized" }, cb);
+  }
+
+  const sheetName = e.parameter.sheet || "Sheet1";
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+
+  if (!sheet) {
+    return respond({ error: "Sheet '" + sheetName + "' not found" }, cb);
+  }
+
+  const raw = sheet.getDataRange().getValues();
+  if (raw.length < 4) {
+    return respond({ rows: [], submittedIds: [], total: 0 }, cb);
+  }
+
+  const headers = raw[2].map(h => String(h).trim());  // row 3 = index 2
+  const rows = raw.slice(3)                            // data starts row 4
+    .filter(r => r.some(c => c !== "" && c !== null && c !== undefined))
+    .map(r => {
+      const obj = {};
+      headers.forEach((h, i) => {
+        const val = r[i];
+        obj[h] = (val !== null && val !== undefined) ? String(val).trim() : "";
+      });
+      return obj;
+    });
+
+  const submittedIds = getSubmittedIds();
+  return respond({ rows: rows, submittedIds: submittedIds, total: rows.length }, cb);
+}
+
+// ── POST: handles both AI screening and saving results ─────────
+function doPost(e) {
+  let body;
+  try { body = JSON.parse(e.postData.contents); }
+  catch (err) { return respond({ error: "Invalid JSON: " + err.toString() }, null); }
+
+  if (body.key !== SECRET_KEY) {
+    return respond({ error: "Unauthorized" }, null);
+  }
+
+  // ── AI SCREENING (action=screen) ────────────────────────────
+  if (body.action === "screen") {
+    return respond(screenWithClaude(body.prompt), null);
+  }
+
+  // ── SAVE RESULT (default) ───────────────────────────────────
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(RESULTS_SHEET);
+
+  if (!sh) {
+    sh = ss.insertSheet(RESULTS_SHEET);
+    const headerRow = [
+      "Timestamp","Venture Name","Applicant","Country","Sector",
+      "App Stage","Stream","Assigned To",
+      "Gate: Venture Stage","Gate: Ummah Align","Gate: Compliance",
+      "Gate: Team","Gate: Viability","Gate: Availability",
+      "AI Score","Human Score","Score Delta",
+      "Rating: Ummah","Rating: Stage","Rating: Team","Rating: Viability",
+      "Verdict","Notes","Edited Gates","Submitted At"
+    ];
+    sh.appendRow(headerRow);
+    sh.getRange(1,1,1,headerRow.length)
+      .setBackground("#1a2e5a")
+      .setFontColor("#ffffff")
+      .setFontWeight("bold");
+    sh.setFrozenRows(1);
+  }
+
+  const d = body;
+  sh.appendRow([
+    new Date().toISOString(),
+    d.ventureName   || "",
+    d.applicantName || "",
+    d.country       || "",
+    d.sector        || "",
+    d.ventureStage  || "",
+    d.stream        || "",
+    d.assignedTo    || "Unassigned",
+    d.gates ? d.gates.stage        : "",
+    d.gates ? d.gates.ummah        : "",
+    d.gates ? d.gates.compliance   : "",
+    d.gates ? d.gates.team         : "",
+    d.gates ? d.gates.viability    : "",
+    d.gates ? d.gates.availability : "",
+    d.aiScore    || 0,
+    d.humanScore || 0,
+    (d.aiScore || 0) - (d.humanScore || 0),
+    d.ratings ? d.ratings.ummah      : 0,
+    d.ratings ? d.ratings.stage      : 0,
+    d.ratings ? d.ratings.team       : 0,
+    d.ratings ? d.ratings.viability  : 0,
+    d.verdict    || "",
+    d.notes      || "",
+    Array.isArray(d.editedGates) ? d.editedGates.join(", ") : "",
+    d.submittedAt || new Date().toISOString()
+  ]);
+
+  return respond({ status: "ok", saved: d.ventureName || "unknown" }, null);
+}
+
+// ── CLAUDE SCREENING (server-side, no CORS issues) ─────────────
+function screenWithClaude(prompt) {
+  try {
+    const response = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", {
+      method: "post",
+      contentType: "application/json",
+      headers: {
+        "x-api-key": ANTHROPIC_KEY,
+        "anthropic-version": "2023-06-01"
+      },
+      payload: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: prompt }]
+      }),
+      muteHttpExceptions: true
+    });
+
+    const data = JSON.parse(response.getContentText());
+    if (data.error) throw new Error(data.error.message);
+    const raw = (data.content || []).map(b => b.text || "").join("");
+    const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+    return { ok: true, result: parsed };
+  } catch(err) {
+    return { ok: false, error: err.toString() };
+  }
+}
+
+// ── HELPERS ───────────────────────────────────────────────────
+function getSubmittedIds() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(RESULTS_SHEET);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const data = sh.getRange(2, 2, sh.getLastRow() - 1, 2).getValues();
+  return data
+    .map(r => (String(r[0]) + "|" + String(r[1])).toLowerCase().trim())
+    .filter(Boolean);
+}
+
+// respond() wraps JSON for both plain JSON and JSONP responses
+function respond(obj, callbackName) {
+  const json = JSON.stringify(obj);
+  if (callbackName) {
+    return ContentService
+      .createTextOutput(callbackName + "(" + json + ");")
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService
+    .createTextOutput(json)
+    .setMimeType(ContentService.MimeType.JSON);
+}</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div id="appShell" style="display:none">
+  <div class="config-bar">
+    <span class="config-label">Connected:</span>
+    <span id="cfgUrlDisplay" style="font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px;flex:1"></span>
+    <span id="cfgStatus"></span>
+    <button class="btn btn-sec" onclick="checkForUpdates()">Check for new entries</button>
+    <button class="btn btn-sec" style="margin-left:auto" onclick="goToSetup()">Settings</button>
+  </div>
+  <div class="summary">
+    <div class="sstat"><div class="val" id="stTotal">0</div><div class="lbl">Applicants</div></div>
+    <div class="sstat adv"><div class="val" id="stAdv">0</div><div class="lbl">Advance</div></div>
+    <div class="sstat rev"><div class="val" id="stRev">0</div><div class="lbl">Needs review</div></div>
+    <div class="sstat rej"><div class="val" id="stRej">0</div><div class="lbl">Do not advance</div></div>
+    <div class="sstat sub"><div class="val" id="stSub">0</div><div class="lbl">Submitted</div></div>
+  </div>
+  <div class="filter-bar">
+    <span class="flbl">Filter:</span>
+    <button class="fpill on" onclick="setFilter('all',this)">All</button>
+    <button class="fpill" onclick="setFilter('advance',this)">Advance</button>
+    <button class="fpill" onclick="setFilter('review',this)">Needs review</button>
+    <button class="fpill" onclick="setFilter('reject',this)">Do not advance</button>
+    <button class="fpill" onclick="setFilter('edited',this)">Edited</button>
+    <button class="fpill" onclick="setFilter('unassigned',this)">Unassigned</button>
+    <button class="fpill" onclick="setFilter('submitted',this)">Submitted</button>
+    <select class="sort-sel" onchange="doSort(this.value)">
+      <option value="score-desc">Score: high → low</option>
+      <option value="score-asc">Score: low → high</option>
+      <option value="alpha">Alphabetical</option>
+      <option value="date">Date applied</option>
+    </select>
+    <button class="refresh-btn" id="refreshBtn" onclick="checkForUpdates()">
+      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 7A6 6 0 0 1 12.5 4M13 7A6 6 0 0 1 1.5 10"/>
+        <path d="M11 1l1.5 3-3 .5M3 13L1.5 10l3-.5"/>
+      </svg>
+      Refresh
+      <span class="new-badge" id="newBadge" style="display:none">0</span>
+    </button>
+  </div>
+  <div class="main" id="cards"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const TEAM=['Salah','Ismail','Fawwaz','Awais','Sahil','Cassandra','Faisal'];
+const GATES=[
+  {id:'stage',label:'Venture stage'},
+  {id:'ummah',label:'Ummah alignment'},
+  {id:'compliance',label:'Islamic compliance'},
+  {id:'team',label:'Team credibility'},
+  {id:'viability',label:'Viability & financials'},
+  {id:'availability',label:'Finals availability'}
+];
+const RATINGS=[
+  {id:'ummah',label:'Ummah impact'},
+  {id:'stage',label:'Stage clarity'},
+  {id:'team',label:'Team strength'},
+  {id:'viability',label:'Viability & financials'}
+];
+
+let apps=[], appFilter='all', sortBy='score-desc';
+let scriptUrl='', secretKey='', sheetName='Sheet1';
+
+// ── CORE JSONP FETCHER ─────────────────────────────────────────
+// All reads go through this single function using JSONP to bypass CORS.
+// A unique callback name is injected into the URL; the script wraps
+// its JSON response in that callback. We append a <script> tag,
+// wait for the callback to fire, then clean up.
+function jsonpFetch(url, timeoutMs) {
+  timeoutMs = timeoutMs || 30000;
+  return new Promise(function(resolve, reject) {
+    var cbName = 'tpss_cb_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+    var script = document.createElement('script');
+    var timer = null;
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[cbName] = function(data) {
+      cleanup();
+      if (data && data.error) {
+        reject(new Error(data.error));
+      } else {
+        resolve(data);
+      }
+    };
+
+    script.onerror = function() {
+      cleanup();
+      reject(new Error(
+        'Script load failed. Possible causes:\n' +
+        '• Apps Script not deployed (needs a deployment, not just a save)\n' +
+        '• Wrong URL — must end in /exec, not /dev\n' +
+        '• Access set to "Only myself" — must be "Anyone"\n' +
+        '• Script has a syntax error preventing execution'
+      ));
+    };
+
+    timer = setTimeout(function() {
+      cleanup();
+      reject(new Error('Request timed out after ' + (timeoutMs/1000) + 's — script may be too slow or URL is unreachable'));
+    }, timeoutMs);
+
+    // Separator between existing params and callback
+    var sep = url.indexOf('?') === -1 ? '?' : '&';
+    script.src = url + sep + 'callback=' + cbName;
+    document.head.appendChild(script);
+  });
+}
+
+// ── SETUP ──────────────────────────────────────────────────────
+function goToSetup() {
+  document.getElementById('setupScreen').style.display='block';
+  document.getElementById('appShell').style.display='none';
+  document.getElementById('phaseBar').style.display='none';
+  document.getElementById('setupScriptUrl').value=scriptUrl;
+  document.getElementById('setupSecretKey').value=secretKey;
+  document.getElementById('setupSheetName').value=sheetName;
+  document.getElementById('testResult').className='test-result';
+}
+
+function toggleScript() {
+  var box=document.getElementById('scriptBox');
+  var tog=document.querySelector('.script-toggle');
+  var open=box.style.display==='block';
+  box.style.display=open?'none':'block';
+  tog.textContent=open?'Show script template →':'Hide script template ↑';
+}
+
+function copyScript() {
+  var code=document.getElementById('scriptCode').textContent;
+  navigator.clipboard.writeText(code).then(function(){
+    var btn=document.querySelector('.copy-btn');
+    btn.textContent='Copied ✓';
+    setTimeout(function(){btn.textContent='Copy';},2000);
+  }).catch(function(){toast('Select the code and copy manually','error');});
+}
+
+// ── TEST CONNECTION ────────────────────────────────────────────
+// Uses the same JSONP fetcher as the main load — identical code path.
+async function testConnection() {
+  var url=document.getElementById('setupScriptUrl').value.trim();
+  var key=document.getElementById('setupSecretKey').value.trim();
+  var sheet=document.getElementById('setupSheetName').value.trim()||'Sheet1';
+  var res=document.getElementById('testResult');
+  var btn=document.getElementById('testBtn');
+
+  if (!url||!key) {
+    res.className='test-result err';
+    res.textContent='Enter both the Script URL and secret key first.';
+    return;
+  }
+
+  res.className='test-result chk';
+  res.textContent='Testing connection…';
+  btn.disabled=true;
+
+  try {
+    var fullUrl=url+'?key='+encodeURIComponent(key)+'&sheet='+encodeURIComponent(sheet);
+    var data=await jsonpFetch(fullUrl, 20000);
+    res.className='test-result ok';
+    res.textContent='Connected — '+data.total+' applicant row(s) found in "'+sheet+'"';
+  } catch(e) {
+    res.className='test-result err';
+    res.textContent='Failed: '+e.message;
+  } finally {
+    btn.disabled=false;
+  }
+}
+
+// ── START APP ──────────────────────────────────────────────────
+async function startApp() {
+  var url=document.getElementById('setupScriptUrl').value.trim();
+  var key=document.getElementById('setupSecretKey').value.trim();
+  var sheet=document.getElementById('setupSheetName').value.trim()||'Sheet1';
+  var res=document.getElementById('testResult');
+
+  if (!url||!key) {
+    res.className='test-result err';
+    res.textContent='Please enter the Script URL and secret key.';
+    return;
+  }
+
+  scriptUrl=url; secretKey=key; sheetName=sheet;
+
+  var btn=document.getElementById('startBtn');
+  btn.innerHTML='<span class="mini-spin"></span> Loading applicants…';
+  btn.disabled=true;
+
+  var data=await fetchApplicants();
+  if (!data) {
+    btn.innerHTML='Connect & load applicants →';
+    btn.disabled=false;
+    return;
+  }
+
+  var rows=dedup(data.rows||[]);
+  var alreadySubmitted=new Set(data.submittedIds||[]);
+
+  document.getElementById('setupScreen').style.display='none';
+  document.getElementById('appShell').style.display='block';
+  document.getElementById('phaseBar').style.display='flex';
+  var disp=document.getElementById('cfgUrlDisplay');
+  if (disp) disp.textContent=url;
+
+  await batchScreen(rows, alreadySubmitted);
+}
+
+// ── FETCH APPLICANTS (secure JSONP read) ───────────────────────
+async function fetchApplicants() {
+  try {
+    var url=scriptUrl+'?key='+encodeURIComponent(secretKey)+'&sheet='+encodeURIComponent(sheetName);
+    // Large sheets can take up to 30s — allow generous timeout
+    var data=await jsonpFetch(url, 45000);
+    return data;
+  } catch(e) {
+    toast('Could not load applicants: '+e.message, 'error');
+    return null;
+  }
+}
+
+// ── DEDUPLICATE ────────────────────────────────────────────────
+function dedup(rows) {
+  var seen=new Map();
+  for (var i=0;i<rows.length;i++) {
+    var row=rows[i];
+    var email=(row['Attendee Details /Email']||'').toLowerCase().trim();
+    var vn=(row['Venture Details /Venture Name']||'').toLowerCase().trim();
+    var key=email||vn||('row_'+i); // ← never drop a row silently
+    if (!seen.has(key)) { seen.set(key,row); }
+    else if (JSON.stringify(row).length>JSON.stringify(seen.get(key)).length) { seen.set(key,row); }
+  }
+  return Array.from(seen.values());
+}
+
+// ── BATCH SCREEN ───────────────────────────────────────────────
+async function batchScreen(rows, alreadySubmitted) {
+  document.getElementById('cards').innerHTML=
+    '<div class="loading-wrap">'+
+    '<div class="spin-lg"></div>'+
+    '<h2>Running AI screening</h2>'+
+    '<p>Scoring all '+rows.length+' applicants against Stage 0 criteria…</p>'+
+    '<div class="prog-bar"><div class="prog-fill" id="pf"></div></div>'+
+    '<div class="prog-lbl" id="pl">Starting…</div>'+
+    '</div>';
+
+  var results=[];
+  if (rows.length > 0) {
+    console.log('[TPSS] Column names from sheet:', Object.keys(rows[0]));
+    console.log('[TPSS] Screening', rows.length, 'applicant(s)');
+  } else {
+    console.warn('[TPSS] WARNING: 0 rows after dedup. Check column names in your sheet match exactly (including spacing around /)');
+  }
+  for (var i=0;i<rows.length;i++) {
+    var vn=rows[i]['Venture Details /Venture Name']||'Unknown';
+    var pf=document.getElementById('pf'), pl=document.getElementById('pl');
+    if (pf) pf.style.width=Math.round(((i+1)/rows.length)*100)+'%';
+    if (pl) pl.textContent='Screening: '+vn+' ('+(i+1)+'/'+rows.length+')';
+    var screened=await screenOne(rows[i]);
+    var compositeId=(screened.ventureName+'|'+screened.applicantName).toLowerCase().trim();
+    if (alreadySubmitted && alreadySubmitted.has(compositeId)) {
+      screened.submitted=true;
+      screened.submittedAt='Previously submitted';
+    }
+    results.push(screened);
+  }
+
+  apps=results;
+  setTimeout(function(){
+    renderAll(); updateSummary();
+    toast('AI screening complete — '+results.length+' applicants scored','success');
+    document.getElementById('ph1').className='phase done';
+    document.getElementById('ph2').className='phase active';
+  },400);
+}
+
+// ── SCREEN ONE ─────────────────────────────────────────────────
+async function screenOne(row) {
+  function g(k){return (row[k]||'').toString().trim();}
+  var vName=g('Venture Details /Venture Name')||'Unknown';
+  var aName=(g('Attendee Details /First Name')+' '+g('Attendee Details /Last Name')).trim();
+
+  var prompt='You are a TPSS Accelerator evaluator. Screen this venture for Stage 0 eligibility.\n\n'+
+    'VENTURE: '+vName+' | APPLICANT: '+aName+' | COUNTRY: '+g('Attendee Details /Country')+'\n'+
+    'SECTOR: '+g('Venture Details /Venture Sector')+' | STAGE: '+g('Venture Details /Venture Stage')+' | TYPE: '+g('Venture Details /Venture Type')+'\n'+
+    'DESCRIPTION: '+g('Venture Details /Venture Description')+'\n'+
+    'MISSION: '+g('Venture Details /Venture Mission')+'\n'+
+    'MAQASID: '+g('Venture Details /Maqasid Alignment')+'\n'+
+    'PROBLEM: '+g('Venture Details /Problem Statement')+'\n'+
+    'SOLUTION: '+g('Venture Details /Venture Solution')+'\n'+
+    'DIFFERENTIATION: '+g('Venture Details /Venture Difference')+'\n'+
+    'TRACTION STATUS: '+g('Venture Details /Current Traction')+'\n'+
+    'TRACTION EVIDENCE: '+g('Venture Details /Traction Examples')+'\n'+
+    'TEAM: '+(g('Venture Details /Cofounders')||g('Venture Details /Cofounder Details'))+'\n'+
+    'FUNDING: '+g('Venture Details /Funding Source')+' | ASK: '+g('Venture Details /Funding Amount')+'\n'+
+    'USE OF FUNDS: '+g('Venture Details /Funds Use')+'\n'+
+    'IMPACT: '+g('Venture Details /Venture Impact')+'\n'+
+    'COMMIT TO FINALS: '+g('Venture Details /Commit')+'\n\n'+
+    'Gate criteria — verdict: "pass", "fail", or "flag" (uncertain):\n'+
+    '1. stage: Proof-of-concept or stronger? Concept-only=fail unless exceptional.\n'+
+    '2. ummah: Explicit Muslim community/Maqasid al-Shariah alignment?\n'+
+    '3. compliance: No haram sectors, no riba-dependent revenue?\n'+
+    '4. team: Named founders, verifiable backgrounds, clear roles?\n'+
+    '5. viability: Credible problem-solution fit, coherent funding ask?\n'+
+    '6. availability: Confirmed for coaching & TPSS 2026 finals?\n\n'+
+    'Return ONLY valid JSON, no markdown:\n'+
+    '{"gates":{"stage":{"verdict":"pass|fail|flag","note":"1 sentence"},"ummah":{"verdict":"pass|fail|flag","note":"1 sentence"},"compliance":{"verdict":"pass|fail|flag","note":"1 sentence"},"team":{"verdict":"pass|fail|flag","note":"1 sentence"},"viability":{"verdict":"pass|fail|flag","note":"1 sentence"},"availability":{"verdict":"pass|fail|flag","note":"1 sentence"}},"ratings":{"ummah":3,"stage":3,"team":3,"viability":3},"summary":"2-sentence impression"}';
+
+  var ai;
+  try {
+    var resp=await fetch(scriptUrl,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({key:secretKey, action:'screen', prompt:prompt})
+    });
+    var data=await resp.json();
+    if (!data.ok) throw new Error(data.error||'Screening failed');
+    ai=data.result;
+  } catch(err) {
+    ai={
+      gates:{
+        stage:{verdict:'flag',note:'AI analysis failed — review manually.'},
+        ummah:{verdict:'flag',note:'AI analysis failed — review manually.'},
+        compliance:{verdict:'flag',note:'AI analysis failed — review manually.'},
+        team:{verdict:'flag',note:'AI analysis failed — review manually.'},
+        viability:{verdict:'flag',note:'AI analysis failed — review manually.'},
+        availability:{verdict:'flag',note:'AI analysis failed — review manually.'}
+      },
+      ratings:{ummah:3,stage:3,team:3,viability:3},
+      summary:'AI screening failed. Please review manually.'
+    };
+  }
+
+  var humanGates={};
+  GATES.forEach(function(g2){humanGates[g2.id]=ai.gates[g2.id]&&ai.gates[g2.id].verdict||'flag';});
+  var aiScore=calcScore(humanGates,ai.ratings);
+
+  return {
+    id:(g('Attendee Details /Email')||vName).toLowerCase().trim(),
+    email:g('Attendee Details /Email'),
+    applicantName:aName, ventureName:vName,
+    country:g('Attendee Details /Country'),
+    sector:g('Venture Details /Venture Sector'),
+    ventureStage:g('Venture Details /Venture Stage'),
+    stream:g('Attendee Details /Stream'),
+    dateApplied:g('Attendee Details /Date Applied'),
+    aiGates:JSON.parse(JSON.stringify(ai.gates)),
+    humanGates:humanGates,
+    editedGates:new Set(),
+    aiRatings:Object.assign({},ai.ratings),
+    humanRatings:Object.assign({},ai.ratings),
+    editedRatings:new Set(),
+    aiScore:aiScore, humanScore:aiScore,
+    aiSummary:ai.summary||'',
+    assignedTo:'', notes:'',
+    verdict:computeVerdict(humanGates),
+    submitted:false, expanded:false
+  };
+}
+
+// ── SCORING ────────────────────────────────────────────────────
+function gp(v){return v==='pass'?10:v==='flag'?5:0;}
+function calcScore(gates,ratings){
+  var g=0; GATES.forEach(function(x){g+=gp(gates[x.id]||'fail');});
+  var r=0; RATINGS.forEach(function(x){r+=(ratings[x.id]||3);});
+  return Math.min(100,g+Math.round((r/(RATINGS.length*5))*40));
+}
+function computeVerdict(gates){
+  var vs=Object.values(gates);
+  if (vs.some(function(v){return v==='fail';})) return'reject';
+  if (vs.some(function(v){return v==='flag';})) return'review';
+  return'advance';
+}
+
+// ── RENDER ─────────────────────────────────────────────────────
+function renderAll(){
+  var container=document.getElementById('cards');
+  var list=apps.filter(function(a){
+    if (appFilter==='all') return true;
+    if (appFilter==='advance') return a.verdict==='advance'&&!a.submitted;
+    if (appFilter==='review') return a.verdict==='review'&&!a.submitted;
+    if (appFilter==='reject') return a.verdict==='reject'&&!a.submitted;
+    if (appFilter==='edited') return a.editedGates.size>0||a.editedRatings.size>0;
+    if (appFilter==='unassigned') return !a.assignedTo&&!a.submitted;
+    if (appFilter==='submitted') return a.submitted;
+    return true;
+  });
+  list=list.slice().sort(function(a,b){
+    if (sortBy==='score-desc') return b.humanScore-a.humanScore;
+    if (sortBy==='score-asc') return a.humanScore-b.humanScore;
+    if (sortBy==='alpha') return a.ventureName.localeCompare(b.ventureName);
+    if (sortBy==='date') return new Date(a.dateApplied)-new Date(b.dateApplied);
+    return 0;
+  });
+  if (!list.length){
+    container.innerHTML='<div class="empty-state"><h3>No applicants match this filter</h3><p>Try a different filter or check for new entries.</p></div>';
+    return;
+  }
+  container.innerHTML=list.map(function(a){return cardHTML(a);}).join('');
+}
+
+function cardHTML(a){
+  var eid=escId(a.id);
+  var ini=a.ventureName.split(' ').slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase()||'??';
+  var avCls=['av-b','av-t','av-p','av-c','av-g'][Math.abs(hash(a.id))%5];
+  var sc=a.humanScore>=70?'hi':a.humanScore>=45?'md':'lo';
+  var vBadge=a.submitted?'vb-sub':a.verdict==='advance'?'vb-adv':a.verdict==='review'?'vb-rev':'vb-rej';
+  var vTxt=a.submitted?'Submitted':a.verdict==='advance'?'Advance to Stage 1':a.verdict==='review'?'Needs review':'Do not advance';
+  var assignHtml=a.assignedTo?'Assigned: <strong>'+a.assignedTo+'</strong>':'<span style="color:var(--fail-text);font-weight:600">Unassigned</span>';
+  var chips=GATES.map(function(g){
+    var v=a.humanGates[g.id];var bc=v==='pass'?'p':v==='fail'?'f':'fl';var bl=v==='pass'?'Pass':v==='fail'?'Fail':'Flag';
+    return '<div class="gate-chip"><div class="gc-top"><span class="gc-name">'+g.label+'</span><span class="gbadge '+bc+'">'+bl+'</span></div><div class="gc-note">'+(a.aiGates[g.id]&&a.aiGates[g.id].note||'')+'</div></div>';
+  }).join('');
+  var tags=[];
+  if (a.sector) tags.push('<span class="tag t-edu">'+a.sector.split(',')[0].trim()+'</span>');
+  var stCls=a.ventureStage&&a.ventureStage.toLowerCase().indexOf('non')>=0?'t-npo':a.ventureStage&&a.ventureStage.toLowerCase().indexOf('profit')>=0?'t-fp':'t-sec';
+  if (a.ventureStage) tags.push('<span class="tag '+stCls+'">'+a.ventureStage+'</span>');
+  if (a.country) tags.push('<span class="tag t-sec">'+a.country.replace(/\+\d+/,'').trim()+'</span>');
+  var subBanner=a.submitted?'<div class="sub-banner">✓ Submitted to Google Sheets · '+(a.submittedAt&&a.submittedAt.toString().indexOf('Previously')>=0?a.submittedAt:new Date(a.submittedAt).toLocaleString())+'</div>':'';
+
+  return '<div class="app-card'+(a.submitted?' submitted':'')+'" id="card-'+eid+'">'+
+    '<div class="card-top">'+
+    '<div class="row1">'+
+    '<div class="avatar '+avCls+'">'+ini+'</div>'+
+    '<div class="app-info">'+
+    '<div class="app-name">'+a.ventureName+'</div>'+
+    '<div class="app-sub">'+a.applicantName+' · '+a.country+' · '+a.stream+'</div>'+
+    '<div class="tags">'+tags.join('')+'</div>'+
+    '</div></div>'+
+    '<div class="score-row">'+
+    '<div class="gates-grid" id="gg-'+eid+'">'+chips+'</div>'+
+    '<div class="score-col">'+
+    '<div class="cscore '+sc+'" id="sc-'+eid+'">'+a.humanScore+'</div>'+
+    '<div class="cscore-lbl">composite</div>'+
+    '<div class="sbar"><div class="sfill '+sc+'" id="sf-'+eid+'" style="width:'+a.humanScore+'%"></div></div>'+
+    '</div></div></div>'+
+    '<div class="card-footer">'+
+    '<div class="cf-left"><span class="ai-tag">AI</span><span class="ai-summary">'+a.aiSummary+'</span></div>'+
+    '<div class="cf-right">'+
+    '<span class="assign-disp" id="ad-'+eid+'">'+assignHtml+'</span>'+
+    '<span class="vbadge '+vBadge+'" id="vb-'+eid+'">'+vTxt+'</span>'+
+    (!a.submitted?'<button class="rev-btn'+(a.expanded?' open':'')+'" id="rb-'+eid+'" onclick="toggleExpand('+J(a.id)+')">'+(a.expanded?'Reviewing':'Review')+'</button>':'')+
+    '</div></div>'+
+    subBanner+
+    '<div id="panel-'+eid+'" style="display:'+(a.expanded?'block':'none')+'">'+(a.expanded?panelHTML(a):'')+' </div>'+
+    '</div>';
+}
+
+function panelHTML(a){
+  var eid=escId(a.id);
+  var vc=a.verdict==='advance'?'adv':a.verdict==='review'?'rev':'rej';
+  var vt=a.verdict==='advance'?'Advance to Stage 1':a.verdict==='review'?'Needs review':'Do not advance';
+  var mchips=TEAM.map(function(m){return '<button class="mchip'+(a.assignedTo===m?' sel':'')+'" onclick="assignTo('+J(a.id)+','+J(m)+')">'+m+'</button>';}).join('');
+  var gateEds=GATES.map(function(g){
+    var v=a.humanGates[g.id]; var edited=a.editedGates.has(g.id);
+    return '<div class="ep-gate'+(edited?' edited':'')+'" id="epg-'+eid+'-'+g.id+'">'+
+      '<div class="epg-top"><span class="epg-name">'+g.label+'</span>'+
+      '<div class="pill-grp">'+
+      '<button class="epill'+(v==='pass'?' sp':'')+'" onclick="setGate('+J(a.id)+',\''+g.id+'\',\'pass\')">Pass</button>'+
+      '<button class="epill'+(v==='fail'?' sf':'')+'" onclick="setGate('+J(a.id)+',\''+g.id+'\',\'fail\')">Fail</button>'+
+      '<button class="epill'+(v==='flag'?' sfl':'')+'" onclick="setGate('+J(a.id)+',\''+g.id+'\',\'flag\')">Flag</button>'+
+      '</div></div>'+
+      '<div class="epg-note">'+(a.aiGates[g.id]&&a.aiGates[g.id].note||'')+'</div>'+
+      (edited?'<div class="edited-flag">Reviewer changed: '+(a.aiGates[g.id]&&a.aiGates[g.id].verdict)+' → '+v+'</div>':'')+
+      '</div>';
+  }).join('');
+  var ratRows=RATINGS.map(function(r){
+    var hv=a.humanRatings[r.id]||1; var av=a.aiRatings[r.id]||1; var adj=a.editedRatings.has(r.id);
+    var stars=[1,2,3,4,5].map(function(n){return '<div class="star'+(hv>=n?' on':'')+'" onclick="setRating('+J(a.id)+',\''+r.id+'\','+n+')">'+n+'</div>';}).join('');
+    return '<div class="rat-row"><span class="rlbl">'+r.label+'</span><div class="stars" id="st-'+eid+'-'+r.id+'">'+stars+'</div><span class="rat-ai'+(adj?' adj':'')+'" id="ra-'+eid+'-'+r.id+'">AI: '+av+'/5'+(adj?' · adj':'')+'</span></div>';
+  }).join('');
+
+  return '<div class="expand-panel">'+
+    '<div class="ep-hdr">'+
+    '<span class="ep-title">Review — '+a.ventureName+'</span>'+
+    '<div class="assign-sec"><span class="assign-lbl">Assign to:</span><div class="member-chips" id="mc-'+eid+'">'+mchips+'</div></div>'+
+    '</div>'+
+    '<div class="ep-verdict '+vc+'" id="epv-'+eid+'">'+
+    '<span class="epv-lbl '+vc+'">'+vt+'</span>'+
+    '<span class="epv-score">Score: '+a.humanScore+'/100 · '+Object.values(a.humanGates).filter(function(v){return v==='fail';}).length+' fail · '+Object.values(a.humanGates).filter(function(v){return v==='flag';}).length+' flag</span>'+
+    '</div>'+
+    '<div class="ep-sec">Gate decisions — all editable</div>'+
+    '<div class="ep-gates">'+gateEds+'</div>'+
+    '<div class="ep-sec">Qualitative ratings</div>'+
+    '<div class="ep-ratings">'+ratRows+'</div>'+
+    '<div class="ep-nl">Reviewer notes</div>'+
+    '<textarea class="ep-notes" id="notes-'+eid+'" placeholder="Add context, override rationale, or escalation notes…">'+a.notes+'</textarea>'+
+    '<div class="ep-actions">'+
+    '<span class="ep-act-l" id="ss-'+eid+'">Changes auto-save locally</span>'+
+    '<div class="ep-act-r">'+
+    '<button class="btn-save-card" onclick="saveDraft('+J(a.id)+')">Save draft</button>'+
+    '<button class="btn-submit-card" id="scb-'+eid+'" onclick="submitCard('+J(a.id)+')">Submit to Sheets →</button>'+
+    '</div></div></div>';
+}
+
+// ── INTERACTIONS ───────────────────────────────────────────────
+function toggleExpand(id){
+  var a=getApp(id); if (!a) return;
+  var ne=document.getElementById('notes-'+escId(id)); if (ne) a.notes=ne.value;
+  a.expanded=!a.expanded;
+  var panel=document.getElementById('panel-'+escId(id));
+  var btn=document.getElementById('rb-'+escId(id));
+  if (a.expanded){panel.innerHTML=panelHTML(a);panel.style.display='block';if(btn){btn.textContent='Reviewing';btn.classList.add('open');}}
+  else{panel.style.display='none';panel.innerHTML='';if(btn){btn.textContent='Review';btn.classList.remove('open');}}
+}
+
+function assignTo(id,member){
+  var a=getApp(id); if (!a) return;
+  a.assignedTo=a.assignedTo===member?'':member;
+  var mc=document.getElementById('mc-'+escId(id));
+  if (mc) mc.innerHTML=TEAM.map(function(m){return '<button class="mchip'+(a.assignedTo===m?' sel':'')+'" onclick="assignTo('+J(id)+','+J(m)+')">'+m+'</button>';}).join('');
+  var ad=document.getElementById('ad-'+escId(id));
+  if (ad) ad.innerHTML=a.assignedTo?'Assigned: <strong>'+a.assignedTo+'</strong>':'<span style="color:var(--fail-text);font-weight:600">Unassigned</span>';
+}
+
+function setGate(id,gid,val){
+  var a=getApp(id); if (!a) return;
+  a.humanGates[gid]=val;
+  (val!==( a.aiGates[gid]&&a.aiGates[gid].verdict))?a.editedGates.add(gid):a.editedGates.delete(gid);
+  a.verdict=computeVerdict(a.humanGates);
+  a.humanScore=calcScore(a.humanGates,a.humanRatings);
+  var el=document.getElementById('epg-'+escId(id)+'-'+gid);
+  if (el){
+    el.className='ep-gate'+(a.editedGates.has(gid)?' edited':'');
+    el.innerHTML='<div class="epg-top"><span class="epg-name">'+(GATES.find(function(g){return g.id===gid;})||{label:gid}).label+'</span>'+
+      '<div class="pill-grp">'+
+      '<button class="epill'+(val==='pass'?' sp':'')+'" onclick="setGate('+J(id)+',\''+gid+'\',\'pass\')">Pass</button>'+
+      '<button class="epill'+(val==='fail'?' sf':'')+'" onclick="setGate('+J(id)+',\''+gid+'\',\'fail\')">Fail</button>'+
+      '<button class="epill'+(val==='flag'?' sfl':'')+'" onclick="setGate('+J(id)+',\''+gid+'\',\'flag\')">Flag</button>'+
+      '</div></div>'+
+      '<div class="epg-note">'+(a.aiGates[gid]&&a.aiGates[gid].note||'')+'</div>'+
+      (a.editedGates.has(gid)?'<div class="edited-flag">Reviewer changed: '+(a.aiGates[gid]&&a.aiGates[gid].verdict)+' → '+val+'</div>':'');
+  }
+  liveUpdate(id,a); updateSummary();
+  var gg=document.getElementById('gg-'+escId(id));
+  if (gg) gg.innerHTML=GATES.map(function(g){
+    var v=a.humanGates[g.id];var bc=v==='pass'?'p':v==='fail'?'f':'fl';var bl=v==='pass'?'Pass':v==='fail'?'Fail':'Flag';
+    return '<div class="gate-chip"><div class="gc-top"><span class="gc-name">'+g.label+'</span><span class="gbadge '+bc+'">'+bl+'</span></div><div class="gc-note">'+(a.aiGates[g.id]&&a.aiGates[g.id].note||'')+'</div></div>';
+  }).join('');
+}
+
+function setRating(id,rid,val){
+  var a=getApp(id); if (!a) return;
+  a.humanRatings[rid]=val;
+  (val!==a.aiRatings[rid])?a.editedRatings.add(rid):a.editedRatings.delete(rid);
+  a.humanScore=calcScore(a.humanGates,a.humanRatings);
+  var st=document.getElementById('st-'+escId(id)+'-'+rid);
+  if (st) st.innerHTML=[1,2,3,4,5].map(function(n){return '<div class="star'+(val>=n?' on':'')+'" onclick="setRating('+J(id)+',\''+rid+'\','+n+')">'+n+'</div>';}).join('');
+  var ra=document.getElementById('ra-'+escId(id)+'-'+rid);
+  if (ra){var adj=a.editedRatings.has(rid);ra.className='rat-ai'+(adj?' adj':'');ra.textContent='AI: '+a.aiRatings[rid]+'/5'+(adj?' · adj':'');}
+  liveUpdate(id,a); updateSummary();
+}
+
+function liveUpdate(id,a){
+  var sc=a.humanScore>=70?'hi':a.humanScore>=45?'md':'lo';
+  var sel=document.getElementById('sc-'+escId(id)); var sfl=document.getElementById('sf-'+escId(id));
+  var vb=document.getElementById('vb-'+escId(id)); var epv=document.getElementById('epv-'+escId(id));
+  if (sel){sel.className='cscore '+sc;sel.textContent=a.humanScore;}
+  if (sfl){sfl.className='sfill '+sc;sfl.style.width=a.humanScore+'%';}
+  if (vb&&!a.submitted){
+    var vc2=a.verdict==='advance'?'vb-adv':a.verdict==='review'?'vb-rev':'vb-rej';
+    var vt2=a.verdict==='advance'?'Advance to Stage 1':a.verdict==='review'?'Needs review':'Do not advance';
+    vb.className='vbadge '+vc2; vb.textContent=vt2;
+  }
+  if (epv){
+    var vc3=a.verdict==='advance'?'adv':a.verdict==='review'?'rev':'rej';
+    var vt3=a.verdict==='advance'?'Advance to Stage 1':a.verdict==='review'?'Needs review':'Do not advance';
+    epv.className='ep-verdict '+vc3;
+    epv.innerHTML='<span class="epv-lbl '+vc3+'">'+vt3+'</span><span class="epv-score">Score: '+a.humanScore+'/100 · '+Object.values(a.humanGates).filter(function(v){return v==='fail';}).length+' fail · '+Object.values(a.humanGates).filter(function(v){return v==='flag';}).length+' flag</span>';
+  }
+}
+
+function saveDraft(id){
+  var a=getApp(id); if (!a) return;
+  var ne=document.getElementById('notes-'+escId(id)); if (ne) a.notes=ne.value;
+  try{
+    var d=JSON.parse(localStorage.getItem('tpss_drafts')||'{}');
+    d[id]={humanGates:a.humanGates,humanRatings:a.humanRatings,assignedTo:a.assignedTo,notes:a.notes,editedGates:Array.from(a.editedGates),editedRatings:Array.from(a.editedRatings)};
+    localStorage.setItem('tpss_drafts',JSON.stringify(d));
+    var ss=document.getElementById('ss-'+escId(id)); if (ss) ss.textContent='Draft saved · '+new Date().toLocaleTimeString();
+    toast('Draft saved for '+a.ventureName,'info');
+  }catch(e){toast('Could not save draft','error');}
+}
+
+async function submitCard(id){
+  var a=getApp(id); if (!a) return;
+  var ne=document.getElementById('notes-'+escId(id)); if (ne) a.notes=ne.value;
+  if (!scriptUrl||!secretKey){toast('No connection configured. Go to Settings.','error');return;}
+  var btn=document.getElementById('scb-'+escId(id));
+  if (btn){btn.disabled=true;btn.innerHTML='<span class="mini-spin"></span> Submitting…';}
+  var payload={
+    key:secretKey,
+    ventureName:a.ventureName, applicantName:a.applicantName, country:a.country,
+    sector:a.sector, ventureStage:a.ventureStage, stream:a.stream,
+    assignedTo:a.assignedTo||'Unassigned', gates:a.humanGates,
+    aiScore:a.aiScore, humanScore:a.humanScore, ratings:a.humanRatings,
+    verdict:a.verdict==='advance'?'Advance to Stage 1':a.verdict==='review'?'Needs review':'Do not advance',
+    notes:a.notes, submittedAt:new Date().toISOString(), editedGates:Array.from(a.editedGates)
+  };
+  try{
+    var r=await fetch(scriptUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var data=await r.json();
+    if (data.error) throw new Error(data.error);
+    a.submitted=true; a.submittedAt=payload.submittedAt; a.expanded=false;
+    var cardEl=document.getElementById('card-'+escId(id));
+    if (cardEl) cardEl.outerHTML=cardHTML(a);
+    updateSummary();
+    toast(a.ventureName+' submitted to Google Sheets ✓','success');
+  }catch(err){
+    if (btn){btn.disabled=false;btn.innerHTML='Submit to Sheets →';}
+    toast('Submission failed: '+err.message,'error');
+  }
+}
+
+// ── CHECK FOR UPDATES ──────────────────────────────────────────
+async function checkForUpdates(){
+  var btn=document.getElementById('refreshBtn'); btn.classList.add('spinning');
+  var st=document.getElementById('cfgStatus');
+  if (st){st.textContent='Checking…';st.className='conn-chk';}
+  var data=await fetchApplicants();
+  btn.classList.remove('spinning');
+  if (!data) return;
+  var rows=dedup(data.rows||[]);
+  var existing=new Set(apps.map(function(a){return a.id;}));
+  var newRows=rows.filter(function(row){
+    var email=(row['Attendee Details /Email']||'').toLowerCase().trim();
+    var vn=(row['Venture Details /Venture Name']||'').toLowerCase().trim();
+    return (email||vn)&&!existing.has(email||vn);
+  });
+  if (!newRows.length){
+    if (st){st.textContent='Up to date · '+apps.length+' applicants';st.className='conn-ok';}
+    toast('No new applicants — sheet is up to date','info'); return;
+  }
+  var badge=document.getElementById('newBadge');
+  if (badge){badge.style.display='inline';badge.textContent=newRows.length;}
+  if (st){st.textContent=newRows.length+' new found';st.className='conn-ok';}
+  toast('Found '+newRows.length+' new applicant(s) — screening now…','warning');
+  for (var i=0;i<newRows.length;i++){apps.push(await screenOne(newRows[i]));}
+  if (badge) badge.style.display='none';
+  renderAll(); updateSummary();
+  toast(newRows.length+' new applicant(s) added and scored','success');
+}
+
+// ── SUMMARY / FILTER / SORT ────────────────────────────────────
+function updateSummary(){
+  document.getElementById('stTotal').textContent=apps.length;
+  document.getElementById('stAdv').textContent=apps.filter(function(a){return a.verdict==='advance'&&!a.submitted;}).length;
+  document.getElementById('stRev').textContent=apps.filter(function(a){return a.verdict==='review'&&!a.submitted;}).length;
+  document.getElementById('stRej').textContent=apps.filter(function(a){return a.verdict==='reject'&&!a.submitted;}).length;
+  document.getElementById('stSub').textContent=apps.filter(function(a){return a.submitted;}).length;
+}
+function setFilter(f,btn){appFilter=f;document.querySelectorAll('.fpill').forEach(function(p){p.classList.remove('on');});btn.classList.add('on');renderAll();}
+function doSort(v){sortBy=v;renderAll();}
+
+// ── UTILS ──────────────────────────────────────────────────────
+function getApp(id){return apps.find(function(a){return a.id===id;});}
+function escId(id){return id.replace(/[^a-zA-Z0-9_-]/g,'_');}
+function J(v){return JSON.stringify(v);}
+function hash(s){var h=0;for(var i=0;i<s.length;i++){h=Math.imul(31,h)+s.charCodeAt(i)|0;}return h;}
+function toast(msg,type){
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast '+type+' show';
+  clearTimeout(t._t); t._t=setTimeout(function(){t.classList.remove('show');},3800);
+}
+</script>
+</body>
+</html>
