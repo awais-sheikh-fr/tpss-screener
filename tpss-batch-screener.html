@@ -291,7 +291,7 @@ pre.script{font-size:11px;padding:14px;overflow-x:auto;line-height:1.7;color:var
 
       <div class="sf">
         <label>Gemini API Key (for AI screening)</label>
-        <input type="password" id="setupGeminiKey" placeholder="AIza..." />
+        <input type="password" id="setupGeminiKey" placeholder="AIza..." value="AIzaSyAaRquuLWoT5nq22Zmb8s4URUFUMGHg0Ao" />
         <div class="sf-note">Free at <a href="https://aistudio.google.com" target="_blank" style="color:var(--cyan)">aistudio.google.com</a> → Get API key. Used only in your browser to score applicants.</div>
       </div>
 
@@ -320,6 +320,7 @@ pre.script{font-size:11px;padding:14px;overflow-x:auto;line-height:1.7;color:var
 const SECRET_KEY  = "tpss-2026-awais";   // ← your screener secret key
 const GEMINI_KEY  = "AIza_REPLACE_ME";   // ← paste your Gemini API key here (free at aistudio.google.com)
 const RESULTS_SHEET = "Stage 0 Results";
+const SPREADSHEET_ID = "1QFMo7bAE7NPD8CnaZWDb8ayrfQ3RqVOfyM0015BlNjQ";
 
 // ── READ: loads applicants into the screener tool ──────────────
 function doGet(e) {
@@ -339,19 +340,18 @@ function doGet(e) {
   // ── SAVE RESULT (action=save) ────────────────────────────────
   if (e.parameter.action === "save") {
     try {
-      // Parse gates and ratings back from JSON strings
       const gates   = JSON.parse(e.parameter.gates   || "{}");
       const ratings = JSON.parse(e.parameter.ratings || "{}");
       const edited  = JSON.parse(e.parameter.editedGates || "[]");
-      const d = e.parameter;
+      const p = e.parameter;
       return respond(saveResult({
-        ventureName:  d.ventureName,  applicantName: d.applicantName,
-        country:      d.country,      sector:        d.sector,
-        ventureStage: d.ventureStage, stream:        d.stream,
-        assignedTo:   d.assignedTo,   gates:         gates,
-        aiScore:      d.aiScore,      humanScore:    d.humanScore,
-        ratings:      ratings,        verdict:       d.verdict,
-        notes:        d.notes,        submittedAt:   d.submittedAt,
+        ventureName:  p.ventureName,  applicantName: p.applicantName,
+        country:      p.country,      sector:        p.sector,
+        ventureStage: p.ventureStage, stream:        p.stream,
+        assignedTo:   p.assignedTo,   gates:         gates,
+        aiScore:      p.aiScore,      humanScore:    p.humanScore,
+        ratings:      ratings,        verdict:       p.verdict,
+        notes:        p.notes,        submittedAt:   p.submittedAt,
         editedGates:  edited
       }), cb);
     } catch(err) {
@@ -360,7 +360,7 @@ function doGet(e) {
   }
 
   const sheetName = e.parameter.sheet || "Sheet1";
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(sheetName);
 
   if (!sheet) {
@@ -406,7 +406,7 @@ function doPost(e) {
 }
 
 function saveResult(d) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   let sh = ss.getSheetByName(RESULTS_SHEET);
 
   if (!sh) {
@@ -486,7 +486,7 @@ function screenWithGemini(prompt) {
 
 // ── HELPERS ───────────────────────────────────────────────────
 function getSubmittedIds() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sh = ss.getSheetByName(RESULTS_SHEET);
   if (!sh || sh.getLastRow() < 2) return [];
   const data = sh.getRange(2, 2, sh.getLastRow() - 1, 2).getValues();
@@ -585,7 +585,7 @@ const RATINGS=[
 ];
 
 let apps=[], appFilter='all', sortBy='score-desc';
-let scriptUrl='https://script.google.com/macros/s/AKfycbzBHrn5xipVVHRctbnAZKY2NR6SunaLSJMW2VVPaB_5lplrYedUyILnIEeQICXofaN1/exec', secretKey='tpss-2026-awais', sheetName='Sheet1', geminiKey='';
+let scriptUrl='https://script.google.com/macros/s/AKfycbzBHrn5xipVVHRctbnAZKY2NR6SunaLSJMW2VVPaB_5lplrYedUyILnIEeQICXofaN1/exec', secretKey='tpss-2026-awais', sheetName='Sheet1', geminiKey='AIzaSyAaRquuLWoT5nq22Zmb8s4URUFUMGHg0Ao';
 
 // ── CORE JSONP FETCHER ─────────────────────────────────────────
 // All reads go through this single function using JSONP to bypass CORS.
@@ -709,11 +709,6 @@ async function startApp() {
   if (!url||!key) {
     res.className='test-result err';
     res.textContent='Please enter the Script URL and secret key.';
-    return;
-  }
-  if (!gKey) {
-    res.className='test-result err';
-    res.textContent='Please enter your Gemini API key so applicants can be scored.';
     return;
   }
 
