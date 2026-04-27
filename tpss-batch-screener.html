@@ -291,7 +291,7 @@ pre.script{font-size:11px;padding:14px;overflow-x:auto;line-height:1.7;color:var
 
       <div class="sf">
         <label>Gemini API Key (for AI screening)</label>
-        <input type="password" id="setupGeminiKey" placeholder="AIza..." value="AIzaSyAaRquuLWoT5nq22Zmb8s4URUFUMGHg0Ao" />
+        <input type="password" id="setupGeminiKey" placeholder="AIza..." />
         <div class="sf-note">Free at <a href="https://aistudio.google.com" target="_blank" style="color:var(--cyan)">aistudio.google.com</a> → Get API key. Used only in your browser to score applicants.</div>
       </div>
 
@@ -585,7 +585,7 @@ const RATINGS=[
 ];
 
 let apps=[], appFilter='all', sortBy='score-desc';
-let scriptUrl='https://script.google.com/macros/s/AKfycbzBHrn5xipVVHRctbnAZKY2NR6SunaLSJMW2VVPaB_5lplrYedUyILnIEeQICXofaN1/exec', secretKey='tpss-2026-awais', sheetName='Sheet1', geminiKey='AIzaSyAaRquuLWoT5nq22Zmb8s4URUFUMGHg0Ao';
+let scriptUrl='https://script.google.com/macros/s/AKfycbzBHrn5xipVVHRctbnAZKY2NR6SunaLSJMW2VVPaB_5lplrYedUyILnIEeQICXofaN1/exec', secretKey='tpss-2026-awais', sheetName='Sheet1', geminiKey='';
 
 // ── CORE JSONP FETCHER ─────────────────────────────────────────
 // All reads go through this single function using JSONP to bypass CORS.
