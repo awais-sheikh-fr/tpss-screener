@@ -336,6 +336,29 @@ function doGet(e) {
     return respond(screenWithGemini(prompt), cb);
   }
 
+  // ── SAVE RESULT (action=save) ────────────────────────────────
+  if (e.parameter.action === "save") {
+    try {
+      // Parse gates and ratings back from JSON strings
+      const gates   = JSON.parse(e.parameter.gates   || "{}");
+      const ratings = JSON.parse(e.parameter.ratings || "{}");
+      const edited  = JSON.parse(e.parameter.editedGates || "[]");
+      const d = e.parameter;
+      return respond(saveResult({
+        ventureName:  d.ventureName,  applicantName: d.applicantName,
+        country:      d.country,      sector:        d.sector,
+        ventureStage: d.ventureStage, stream:        d.stream,
+        assignedTo:   d.assignedTo,   gates:         gates,
+        aiScore:      d.aiScore,      humanScore:    d.humanScore,
+        ratings:      ratings,        verdict:       d.verdict,
+        notes:        d.notes,        submittedAt:   d.submittedAt,
+        editedGates:  edited
+      }), cb);
+    } catch(err) {
+      return respond({ error: "Save failed: " + err.toString() }, cb);
+    }
+  }
+
   const sheetName = e.parameter.sheet || "Sheet1";
   const ss    = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(sheetName);
@@ -365,7 +388,7 @@ function doGet(e) {
   return respond({ rows: rows, submittedIds: submittedIds, total: rows.length }, cb);
 }
 
-// ── POST: handles both AI screening and saving results ─────────
+// ── WRITE: saves a reviewed card to "Stage 0 Results" ─────────
 function doPost(e) {
   let body;
   try { body = JSON.parse(e.postData.contents); }
@@ -375,12 +398,14 @@ function doPost(e) {
     return respond({ error: "Unauthorized" }, null);
   }
 
-  // ── AI SCREENING (action=screen) ────────────────────────────
   if (body.action === "screen") {
     return respond(screenWithGemini(body.prompt), null);
   }
 
-  // ── SAVE RESULT (default) ───────────────────────────────────
+  return respond(saveResult(body), null);
+}
+
+function saveResult(d) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(RESULTS_SHEET);
 
@@ -432,7 +457,7 @@ function doPost(e) {
     d.submittedAt || new Date().toISOString()
   ]);
 
-  return respond({ status: "ok", saved: d.ventureName || "unknown" }, null);
+  return { status: "ok", saved: d.ventureName || "unknown" };
 }
 
 // ── GEMINI SCREENING (server-side via UrlFetchApp, no CORS) ────
@@ -1180,6 +1205,7 @@ async function submitCard(id){
   if (btn){btn.disabled=true;btn.innerHTML='<span class="mini-spin"></span> Submitting…';}
   var payload={
     key:secretKey,
+    action:'save',
     ventureName:a.ventureName, applicantName:a.applicantName, country:a.country,
     sector:a.sector, ventureStage:a.ventureStage, stream:a.stream,
     assignedTo:a.assignedTo||'Unassigned', gates:a.humanGates,
@@ -1188,8 +1214,13 @@ async function submitCard(id){
     notes:a.notes, submittedAt:new Date().toISOString(), editedGates:Array.from(a.editedGates)
   };
   try{
-    var r=await fetch(scriptUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    var data=await r.json();
+    // Use JSONP GET to avoid CORS — same pattern as data loading
+    var submitUrl=scriptUrl+'?'+Object.keys(payload).map(function(k){
+      var v=payload[k];
+      if (typeof v==='object') v=JSON.stringify(v);
+      return encodeURIComponent(k)+'='+encodeURIComponent(v);
+    }).join('&');
+    var data=await jsonpFetch(submitUrl, 20000);
     if (data.error) throw new Error(data.error);
     a.submitted=true; a.submittedAt=payload.submittedAt; a.expanded=false;
     var cardEl=document.getElementById('card-'+escId(id));
