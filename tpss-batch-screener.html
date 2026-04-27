@@ -835,6 +835,8 @@ async function batchScreen(rows, alreadySubmitted, savedAssignments) {
     if (pf) pf.style.width=Math.round(((i+1)/rows.length)*100)+'%';
     if (pl) pl.textContent='Screening: '+vn+' ('+(i+1)+'/'+rows.length+')';
     var screened=await screenOne(rows[i]);
+    // Small delay between requests to avoid overwhelming Gemini
+    if (i < rows.length - 1) await new Promise(function(r){setTimeout(r, 2000);});
     var compositeId=(screened.ventureName+'|'+screened.applicantName).toLowerCase().trim();
     if (alreadySubmitted && alreadySubmitted.has(compositeId)) {
       screened.submitted=true;
@@ -885,28 +887,44 @@ async function screenOne(row) {
   var ai;
   try {
     if (!geminiKey) throw new Error('No Gemini API key configured');
-    var resp = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + encodeURIComponent(geminiKey),
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
-        })
+
+    // Retry up to 3 times with exponential backoff for 503 capacity errors
+    var resp, data, lastErr;
+    for (var attempt=0; attempt<3; attempt++) {
+      if (attempt > 0) {
+        var waitMs = attempt * 8000; // 8s, then 16s
+        var pl=document.getElementById('pl');
+        if (pl) pl.textContent='Gemini busy — retrying '+vName+' in '+(waitMs/1000)+'s… (attempt '+(attempt+1)+'/3)';
+        await new Promise(function(r){setTimeout(r, waitMs);});
       }
-    );
-    var data = await resp.json();
+      resp = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + encodeURIComponent(geminiKey),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
+          })
+        }
+      );
+      data = await resp.json();
+      if (resp.status === 503 || (data.error && data.error.code === 503)) {
+        lastErr = new Error(data.error ? data.error.message : 'Service unavailable');
+        continue; // retry
+      }
+      lastErr = null;
+      break;
+    }
+    if (lastErr) throw lastErr;
     if (data.error) throw new Error(data.error.message);
+
     var raw = data.candidates[0].content.parts[0].text || '';
-    // Extract just the JSON object, then aggressively clean string values
     var cleaned = raw.replace(/```json|```/g, '').trim();
-    // Extract from first { to last }
     var start = cleaned.indexOf('{');
     var end = cleaned.lastIndexOf('}');
     if (start === -1 || end === -1) throw new Error('No JSON object found in response');
     cleaned = cleaned.slice(start, end + 1);
-    // Remove control characters that break JSON parsing
     cleaned = cleaned.replace(/[\x00-\x1F\x7F]/g, ' ');
     console.log('[TPSS] Raw JSON for', vName, ':', cleaned);
     ai = JSON.parse(cleaned);
