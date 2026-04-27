@@ -95,7 +95,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .gates-grid{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
 .gate-chip{padding:6px 8px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface2)}
 .gc-top{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:3px}
-.gc-name{font-size:10px;color:var(--text2);font-weight:600;font-family:'Montserrat',sans-serif;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:76px}
+.gc-name{font-size:10px;color:var(--text2);font-weight:600;font-family:'Montserrat',sans-serif;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
 .gbadge{font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;flex-shrink:0;font-family:'Montserrat',sans-serif;letter-spacing:.02em}
 .gbadge.p{background:var(--pass-bg);color:var(--pass-text)}
 .gbadge.f{background:var(--fail-bg);color:var(--fail-text)}
@@ -115,7 +115,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .card-footer{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-top:1px solid var(--border);background:var(--surface2);gap:10px;flex-wrap:wrap}
 .cf-left{display:flex;align-items:center;gap:7px;flex:1;min-width:0}
 .ai-tag{font-size:10px;background:var(--cyan-pale);color:#185fa5;padding:2px 8px;border-radius:20px;font-weight:700;font-family:'Montserrat',sans-serif;flex-shrink:0}
-.ai-summary{font-size:11px;color:var(--text2);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px}
+.ai-summary{font-size:11px;color:var(--text2);font-style:italic;line-height:1.5;flex:1}
 .cf-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .assign-disp{font-size:11px;color:var(--text3)}
 .assign-disp strong{color:var(--text);font-weight:500}
@@ -270,7 +270,7 @@ pre.script{font-size:11px;padding:14px;overflow-x:auto;line-height:1.7;color:var
       <div class="test-row">
         <div class="sf">
           <label>Apps Script Web App URL</label>
-          <input type="url" id="setupScriptUrl" placeholder="https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec" />
+          <input type="url" id="setupScriptUrl" placeholder="https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec" value="https://script.google.com/macros/s/AKfycbzBHrn5xipVVHRctbnAZKY2NR6SunaLSJMW2VVPaB_5lplrYedUyILnIEeQICXofaN1/exec" />
           <div class="sf-note">In your sheet: Extensions → Apps Script → Deploy → New deployment → Web App → Execute as: Me · Access: Anyone → copy the URL.</div>
         </div>
         <button class="btn-test" id="testBtn" onclick="testConnection()">Test</button>
@@ -279,7 +279,7 @@ pre.script{font-size:11px;padding:14px;overflow-x:auto;line-height:1.7;color:var
       <div class="sf-row">
         <div class="sf">
           <label>Secret key</label>
-          <input type="password" id="setupSecretKey" placeholder="e.g. tpss-2026-awais" />
+          <input type="password" id="setupSecretKey" placeholder="e.g. tpss-2026-awais" value="tpss-2026-awais" />
           <div class="sf-note">Must match the SECRET_KEY in your Apps Script exactly.</div>
         </div>
         <div class="sf">
@@ -560,7 +560,7 @@ const RATINGS=[
 ];
 
 let apps=[], appFilter='all', sortBy='score-desc';
-let scriptUrl='', secretKey='', sheetName='Sheet1', geminiKey='';
+let scriptUrl='https://script.google.com/macros/s/AKfycbzBHrn5xipVVHRctbnAZKY2NR6SunaLSJMW2VVPaB_5lplrYedUyILnIEeQICXofaN1/exec', secretKey='tpss-2026-awais', sheetName='Sheet1', geminiKey='';
 
 // ── CORE JSONP FETCHER ─────────────────────────────────────────
 // All reads go through this single function using JSONP to bypass CORS.
@@ -867,6 +867,24 @@ async function screenOne(row) {
     ventureStage:g('Venture Stage'),
     stream:g('Stream'),
     dateApplied:g('Date Applied'),
+    // Store key applicant responses for reviewer reference
+    rawFields:{
+      'Description': row['Venture Description']||'',
+      'Mission': row['Venture Mission']||'',
+      'Maqasid Alignment': row['Maqasid Alignment']||'',
+      'Problem Statement': row['Problem Statement']||'',
+      'Solution': row['Venture Solution']||'',
+      'Differentiation': row['Venture Difference']||'',
+      'Current Traction': row['Current Traction']||'',
+      'Traction Examples': row['Traction Examples']||'',
+      'Team / Cofounders': (row['Cofounders']||row['Cofounder Details']||''),
+      'Funding Source': row['Funding Source']||'',
+      'Funding Ask': row['Funding Amount']||'',
+      'Use of Funds': row['Funds Use']||'',
+      'Impact': row['Venture Impact']||'',
+      'Commit to Finals': row['Commit']||'',
+      'Pitch Deck': row['Pitch Deck']||''
+    },
     aiGates:JSON.parse(JSON.stringify(ai.gates)),
     humanGates:humanGates,
     editedGates:new Set(),
@@ -1002,10 +1020,18 @@ function panelHTML(a){
     return '<div class="rat-row"><span class="rlbl">'+r.label+'</span><div class="stars" id="st-'+eid+'-'+r.id+'">'+stars+'</div><span class="rat-ai'+(adj?' adj':'')+'" id="ra-'+eid+'-'+r.id+'">AI: '+av+'/5'+(adj?' · adj':'')+'</span></div>';
   }).join('');
 
-  // Raw AI response
-  var rawSection='<div class="ep-sec" style="margin-top:16px">Raw AI response</div>'+
-    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;font-size:11px;color:var(--text2);font-family:monospace;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto">'+
-    JSON.stringify({gates:a.aiGates,ratings:a.aiRatings,summary:a.aiSummary},null,2)+
+  // Applicant responses from spreadsheet
+  var fields=a.rawFields||{};
+  var fieldRows=Object.keys(fields).filter(function(k){return fields[k];}).map(function(k){
+    return '<div style="margin-bottom:10px">'+
+      '<div style="font-size:10px;font-weight:700;color:var(--text2);font-family:\'Montserrat\',sans-serif;letter-spacing:.04em;text-transform:uppercase;margin-bottom:3px">'+k+'</div>'+
+      '<div style="font-size:12px;color:var(--text);line-height:1.6">'+fields[k]+'</div>'+
+      '</div>';
+  }).join('<hr style="border:none;border-top:1px solid var(--border);margin:10px 0">');
+
+  var rawSection='<div class="ep-sec" style="margin-top:16px">Applicant responses</div>'+
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px 16px;max-height:320px;overflow-y:auto">'+
+    (fieldRows||'<span style="font-size:12px;color:var(--text3)">No response data available.</span>')+
     '</div>';
 
   return '<div class="expand-panel">'+
