@@ -119,6 +119,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .cf-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .assign-disp{font-size:11px;color:var(--text3)}
 .assign-disp strong{color:var(--text);font-weight:500}
+.assign-inline{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.assign-inline-lbl{font-size:11px;color:var(--text3);white-space:nowrap}
+.assign-sel{font-size:11px;padding:3px 8px;border-radius:var(--r-sm);border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;max-width:140px}
+.assign-sel.assigned{border-color:var(--cyan);color:var(--navy);font-weight:600}
+.assign-saving{font-size:10px;color:var(--text3);font-style:italic}
 .vbadge{font-size:11px;font-weight:700;padding:4px 13px;border-radius:20px;font-family:'Montserrat',sans-serif;letter-spacing:.02em}
 .vb-adv{background:var(--pass-bg);color:var(--pass-text);border:1px solid var(--pass-border)}
 .vb-rev{background:var(--flag-bg);color:var(--flag-text);border:1px solid var(--flag-border)}
@@ -359,6 +364,35 @@ function doGet(e) {
     }
   }
 
+  // ── ASSIGN REVIEWER (action=assign) ─────────────────────────
+  if (e.parameter.action === "assign") {
+    try {
+      const ventureId = e.parameter.ventureId || "";
+      const assignee  = e.parameter.assignee  || "";
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      let sh = ss.getSheetByName("Stage 0 Assignments");
+      if (!sh) {
+        sh = ss.insertSheet("Stage 0 Assignments");
+        sh.appendRow(["Venture ID", "Assignee", "Updated At"]);
+        sh.getRange(1,1,1,3).setBackground("#1a2e5a").setFontColor("#ffffff").setFontWeight("bold");
+        sh.setFrozenRows(1);
+      }
+      // Update existing row or append new one
+      const data = sh.getDataRange().getValues();
+      let found = false;
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][0]).toLowerCase().trim() === ventureId.toLowerCase().trim()) {
+          sh.getRange(i+1, 2, 1, 2).setValues([[assignee, new Date().toISOString()]]);
+          found = true; break;
+        }
+      }
+      if (!found) sh.appendRow([ventureId, assignee, new Date().toISOString()]);
+      return respond({ ok: true }, cb);
+    } catch(err) {
+      return respond({ error: "Assign failed: " + err.toString() }, cb);
+    }
+  }
+
   const sheetName = e.parameter.sheet || "Sheet1";
   const ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(sheetName);
@@ -369,11 +403,11 @@ function doGet(e) {
 
   const raw = sheet.getDataRange().getValues();
   if (raw.length < 4) {
-    return respond({ rows: [], submittedIds: [], total: 0 }, cb);
+    return respond({ rows: [], submittedIds: [], assignments: {}, total: 0 }, cb);
   }
 
-  const headers = raw[2].map(h => String(h).trim());  // row 3 = index 2
-  const rows = raw.slice(3)                            // data starts row 4
+  const headers = raw[2].map(h => String(h).trim());
+  const rows = raw.slice(3)
     .filter(r => r.some(c => c !== "" && c !== null && c !== undefined))
     .map(r => {
       const obj = {};
@@ -385,7 +419,8 @@ function doGet(e) {
     });
 
   const submittedIds = getSubmittedIds();
-  return respond({ rows: rows, submittedIds: submittedIds, total: rows.length }, cb);
+  const assignments  = getAssignments();
+  return respond({ rows: rows, submittedIds: submittedIds, assignments: assignments, total: rows.length }, cb);
 }
 
 // ── WRITE: saves a reviewed card to "Stage 0 Results" ─────────
@@ -428,7 +463,6 @@ function saveResult(d) {
     sh.setFrozenRows(1);
   }
 
-  const d = body;
   sh.appendRow([
     new Date().toISOString(),
     d.ventureName   || "",
@@ -484,7 +518,18 @@ function screenWithGemini(prompt) {
   }
 }
 
-// ── HELPERS ───────────────────────────────────────────────────
+function getAssignments() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sh = ss.getSheetByName("Stage 0 Assignments");
+  if (!sh || sh.getLastRow() < 2) return {};
+  const data = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+  const map = {};
+  data.forEach(r => {
+    if (r[0]) map[String(r[0]).toLowerCase().trim()] = String(r[1]).trim();
+  });
+  return map;
+}
+
 function getSubmittedIds() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sh = ss.getSheetByName(RESULTS_SHEET);
@@ -727,6 +772,7 @@ async function startApp() {
 
   var rows=dedup(data.rows||[]);
   var alreadySubmitted=new Set(data.submittedIds||[]);
+  var savedAssignments=data.assignments||{};
 
   document.getElementById('setupScreen').style.display='none';
   document.getElementById('appShell').style.display='block';
@@ -734,7 +780,7 @@ async function startApp() {
   var disp=document.getElementById('cfgUrlDisplay');
   if (disp) disp.textContent=url;
 
-  await batchScreen(rows, alreadySubmitted);
+  await batchScreen(rows, alreadySubmitted, savedAssignments);
 }
 
 // ── FETCH APPLICANTS (secure JSONP read) ───────────────────────
@@ -765,7 +811,8 @@ function dedup(rows) {
 }
 
 // ── BATCH SCREEN ───────────────────────────────────────────────
-async function batchScreen(rows, alreadySubmitted) {
+async function batchScreen(rows, alreadySubmitted, savedAssignments) {
+  savedAssignments = savedAssignments || {};
   document.getElementById('cards').innerHTML=
     '<div class="loading-wrap">'+
     '<div class="spin-lg"></div>'+
@@ -792,6 +839,11 @@ async function batchScreen(rows, alreadySubmitted) {
     if (alreadySubmitted && alreadySubmitted.has(compositeId)) {
       screened.submitted=true;
       screened.submittedAt='Previously submitted';
+    }
+    // Restore saved assignment from sheet
+    var assignKey=screened.id.toLowerCase().trim();
+    if (savedAssignments[assignKey]) {
+      screened.assignedTo=savedAssignments[assignKey];
     }
     results.push(screened);
   }
@@ -967,7 +1019,14 @@ function cardHTML(a){
   var sc=a.humanScore>=70?'hi':a.humanScore>=45?'md':'lo';
   var vBadge=a.submitted?'vb-sub':a.verdict==='advance'?'vb-adv':a.verdict==='review'?'vb-rev':'vb-rej';
   var vTxt=a.submitted?'Submitted':a.verdict==='advance'?'Advance to Stage 1':a.verdict==='review'?'Needs review':'Do not advance';
-  var assignHtml=a.assignedTo?'Assigned: <strong>'+a.assignedTo+'</strong>':'<span style="color:var(--fail-text);font-weight:600">Unassigned</span>';
+  var assignSel='<div class="assign-inline">'+
+    '<span class="assign-inline-lbl">Assign:</span>'+
+    '<select class="assign-sel'+(a.assignedTo?' assigned':'')+'" id="as-'+eid+'" data-id="'+eid+'" onchange="assignToCard(this)">'+
+    '<option value="">— Unassigned —</option>'+
+    TEAM.map(function(m){return '<option value="'+m+'"'+(a.assignedTo===m?' selected':'')+'>'+m+'</option>';}).join('')+
+    '</select>'+
+    '<span class="assign-saving" id="asv-'+eid+'"></span>'+
+    '</div>';
   var chips=GATES.map(function(g){
     var v=a.humanGates[g.id];var bc=v==='pass'?'p':v==='fail'?'f':'fl';var bl=v==='pass'?'Pass':v==='fail'?'Fail':'Flag';
     return '<div class="gate-chip"><div class="gc-top"><span class="gc-name">'+g.label+'</span><span class="gbadge '+bc+'">'+bl+'</span></div><div class="gc-note">'+(a.aiGates[g.id]&&a.aiGates[g.id].note||'')+'</div></div>';
@@ -998,7 +1057,7 @@ function cardHTML(a){
     '<div class="card-footer">'+
     '<div class="cf-left"><span class="ai-tag">AI</span><span class="ai-summary">'+a.aiSummary+'</span></div>'+
     '<div class="cf-right">'+
-    '<span class="assign-disp" id="ad-'+eid+'">'+assignHtml+'</span>'+
+    assignSel+
     '<span class="vbadge '+vBadge+'" id="vb-'+eid+'">'+vTxt+'</span>'+
     (!a.submitted?'<button class="rev-btn'+(a.expanded?' open':'')+'" id="rb-'+eid+'" data-id="'+eid+'" onclick="toggleExpand(this)">'+(a.expanded?'Reviewing':'Review')+'</button>':'')+
     '</div></div>'+
@@ -1090,11 +1149,43 @@ function toggleExpand(btn){
   else{panel.style.display='none';panel.innerHTML='';if(rb){rb.textContent='Review';rb.classList.remove('open');}}
 }
 
+function assignToCard(sel){
+  var eid=sel.dataset.id;
+  var a=apps.find(function(x){return escId(x.id)===eid;}); if (!a) return;
+  var member=sel.value;
+  a.assignedTo=member;
+  sel.className='assign-sel'+(member?' assigned':'');
+  // Sync dropdown in expanded panel if open
+  var panelSel=document.getElementById('rv-'+eid);
+  if (panelSel) panelSel.value=member;
+  // Show saving indicator
+  var savingEl=document.getElementById('asv-'+eid);
+  if (savingEl) savingEl.textContent='Saving…';
+  // Persist to sheet
+  persistAssignment(a.id, member, function(ok){
+    if (savingEl) savingEl.textContent=ok?'Saved ✓':'Save failed';
+    setTimeout(function(){if(savingEl)savingEl.textContent='';},2000);
+  });
+}
+
 function assignTo(eid, member){
   var a=apps.find(function(x){return escId(x.id)===eid;}); if (!a) return;
   a.assignedTo=member;
-  var ad=document.getElementById('ad-'+eid);
-  if (ad) ad.innerHTML=a.assignedTo?'Assigned: <strong>'+a.assignedTo+'</strong>':'<span style="color:var(--fail-text);font-weight:600">Unassigned</span>';
+  // Sync the card-level dropdown
+  var cardSel=document.getElementById('as-'+eid);
+  if (cardSel){cardSel.value=member;cardSel.className='assign-sel'+(member?' assigned':'');}
+}
+
+async function persistAssignment(id, member, cb){
+  try {
+    var url=scriptUrl+
+      '?key='+encodeURIComponent(secretKey)+
+      '&action=assign'+
+      '&ventureId='+encodeURIComponent(id)+
+      '&assignee='+encodeURIComponent(member);
+    var data=await jsonpFetch(url, 10000);
+    cb(!data.error);
+  } catch(e){ cb(false); }
 }
 
 function setGateBtn(btn){
@@ -1237,6 +1328,17 @@ async function checkForUpdates(){
   btn.classList.remove('spinning');
   if (!data) return;
   var rows=dedup(data.rows||[]);
+  var savedAssignments=data.assignments||{};
+  // Re-apply any new assignments to existing apps
+  apps.forEach(function(a){
+    var k=a.id.toLowerCase().trim();
+    if (savedAssignments[k] && !a.assignedTo) {
+      a.assignedTo=savedAssignments[k];
+      var eid=escId(a.id);
+      var sel=document.getElementById('as-'+eid);
+      if (sel){sel.value=a.assignedTo;sel.className='assign-sel assigned';}
+    }
+  });
   var existing=new Set(apps.map(function(a){return a.id;}));
   var newRows=rows.filter(function(row){
     var email=(row['Email']||'').toLowerCase().trim();
@@ -1251,7 +1353,12 @@ async function checkForUpdates(){
   if (badge){badge.style.display='inline';badge.textContent=newRows.length;}
   if (st){st.textContent=newRows.length+' new found';st.className='conn-ok';}
   toast('Found '+newRows.length+' new applicant(s) — screening now…','warning');
-  for (var i=0;i<newRows.length;i++){apps.push(await screenOne(newRows[i]));}
+  for (var i=0;i<newRows.length;i++){
+    var screened=await screenOne(newRows[i]);
+    var k=screened.id.toLowerCase().trim();
+    if (savedAssignments[k]) screened.assignedTo=savedAssignments[k];
+    apps.push(screened);
+  }
   if (badge) badge.style.display='none';
   renderAll(); updateSummary();
   toast(newRows.length+' new applicant(s) added and scored','success');
