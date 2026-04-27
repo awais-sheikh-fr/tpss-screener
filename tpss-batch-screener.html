@@ -820,7 +820,7 @@ async function screenOne(row) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 2048 }
+          generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
         })
       }
     );
@@ -962,7 +962,7 @@ function cardHTML(a){
     '<div class="cf-right">'+
     '<span class="assign-disp" id="ad-'+eid+'">'+assignHtml+'</span>'+
     '<span class="vbadge '+vBadge+'" id="vb-'+eid+'">'+vTxt+'</span>'+
-    (!a.submitted?'<button class="rev-btn'+(a.expanded?' open':'')+'" id="rb-'+eid+'" onclick="toggleExpand('+J(a.id)+')">'+(a.expanded?'Reviewing':'Review')+'</button>':'')+
+    (!a.submitted?'<button class="rev-btn'+(a.expanded?' open':'')+'" id="rb-'+eid+'" data-id="'+eid+'" onclick="toggleExpand(this)">'+(a.expanded?'Reviewing':'Review')+'</button>':'')+
     '</div></div>'+
     subBanner+
     '<div id="panel-'+eid+'" style="display:'+(a.expanded?'block':'none')+'">'+(a.expanded?panelHTML(a):'')+' </div>'+
@@ -973,30 +973,45 @@ function panelHTML(a){
   var eid=escId(a.id);
   var vc=a.verdict==='advance'?'adv':a.verdict==='review'?'rev':'rej';
   var vt=a.verdict==='advance'?'Advance to Stage 1':a.verdict==='review'?'Needs review':'Do not advance';
-  var mchips=TEAM.map(function(m){return '<button class="mchip'+(a.assignedTo===m?' sel':'')+'" onclick="assignTo('+J(a.id)+','+J(m)+')">'+m+'</button>';}).join('');
+
+  // Reviewer dropdown
+  var ddOpts='<option value="">— Unassigned —</option>'+TEAM.map(function(m){
+    return '<option value="'+m+'"'+(a.assignedTo===m?' selected':'')+'>'+m+'</option>';
+  }).join('');
+  var reviewerDD='<select class="sort-sel" id="rv-'+eid+'" onchange="assignTo(\''+eid+'\',this.value)" style="font-size:12px;padding:5px 9px">'+ddOpts+'</select>';
+
   var gateEds=GATES.map(function(g){
     var v=a.humanGates[g.id]; var edited=a.editedGates.has(g.id);
     return '<div class="ep-gate'+(edited?' edited':'')+'" id="epg-'+eid+'-'+g.id+'">'+
       '<div class="epg-top"><span class="epg-name">'+g.label+'</span>'+
       '<div class="pill-grp">'+
-      '<button class="epill'+(v==='pass'?' sp':'')+'" onclick="setGate('+J(a.id)+',\''+g.id+'\',\'pass\')">Pass</button>'+
-      '<button class="epill'+(v==='fail'?' sf':'')+'" onclick="setGate('+J(a.id)+',\''+g.id+'\',\'fail\')">Fail</button>'+
-      '<button class="epill'+(v==='flag'?' sfl':'')+'" onclick="setGate('+J(a.id)+',\''+g.id+'\',\'flag\')">Flag</button>'+
+      '<button class="epill'+(v==='pass'?' sp':'')+'" data-id="'+eid+'" data-gid="'+g.id+'" data-val="pass" onclick="setGateBtn(this)">Pass</button>'+
+      '<button class="epill'+(v==='fail'?' sf':'')+'" data-id="'+eid+'" data-gid="'+g.id+'" data-val="fail" onclick="setGateBtn(this)">Fail</button>'+
+      '<button class="epill'+(v==='flag'?' sfl':'')+'" data-id="'+eid+'" data-gid="'+g.id+'" data-val="flag" onclick="setGateBtn(this)">Flag</button>'+
       '</div></div>'+
       '<div class="epg-note">'+(a.aiGates[g.id]&&a.aiGates[g.id].note||'')+'</div>'+
       (edited?'<div class="edited-flag">Reviewer changed: '+(a.aiGates[g.id]&&a.aiGates[g.id].verdict)+' → '+v+'</div>':'')+
       '</div>';
   }).join('');
+
   var ratRows=RATINGS.map(function(r){
     var hv=a.humanRatings[r.id]||1; var av=a.aiRatings[r.id]||1; var adj=a.editedRatings.has(r.id);
-    var stars=[1,2,3,4,5].map(function(n){return '<div class="star'+(hv>=n?' on':'')+'" onclick="setRating('+J(a.id)+',\''+r.id+'\','+n+')">'+n+'</div>';}).join('');
+    var stars=[1,2,3,4,5].map(function(n){
+      return '<div class="star'+(hv>=n?' on':'')+'" data-id="'+eid+'" data-rid="'+r.id+'" data-val="'+n+'" onclick="setRatingBtn(this)">'+n+'</div>';
+    }).join('');
     return '<div class="rat-row"><span class="rlbl">'+r.label+'</span><div class="stars" id="st-'+eid+'-'+r.id+'">'+stars+'</div><span class="rat-ai'+(adj?' adj':'')+'" id="ra-'+eid+'-'+r.id+'">AI: '+av+'/5'+(adj?' · adj':'')+'</span></div>';
   }).join('');
+
+  // Raw AI response
+  var rawSection='<div class="ep-sec" style="margin-top:16px">Raw AI response</div>'+
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;font-size:11px;color:var(--text2);font-family:monospace;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto">'+
+    JSON.stringify({gates:a.aiGates,ratings:a.aiRatings,summary:a.aiSummary},null,2)+
+    '</div>';
 
   return '<div class="expand-panel">'+
     '<div class="ep-hdr">'+
     '<span class="ep-title">Review — '+a.ventureName+'</span>'+
-    '<div class="assign-sec"><span class="assign-lbl">Assign to:</span><div class="member-chips" id="mc-'+eid+'">'+mchips+'</div></div>'+
+    '<div class="assign-sec"><span class="assign-lbl">Assign to:</span>'+reviewerDD+'</div>'+
     '</div>'+
     '<div class="ep-verdict '+vc+'" id="epv-'+eid+'">'+
     '<span class="epv-lbl '+vc+'">'+vt+'</span>'+
@@ -1006,34 +1021,58 @@ function panelHTML(a){
     '<div class="ep-gates">'+gateEds+'</div>'+
     '<div class="ep-sec">Qualitative ratings</div>'+
     '<div class="ep-ratings">'+ratRows+'</div>'+
-    '<div class="ep-nl">Reviewer notes</div>'+
+    rawSection+
+    '<div class="ep-nl" style="margin-top:16px">Reviewer notes</div>'+
     '<textarea class="ep-notes" id="notes-'+eid+'" placeholder="Add context, override rationale, or escalation notes…">'+a.notes+'</textarea>'+
     '<div class="ep-actions">'+
     '<span class="ep-act-l" id="ss-'+eid+'">Changes auto-save locally</span>'+
     '<div class="ep-act-r">'+
-    '<button class="btn-save-card" onclick="saveDraft('+J(a.id)+')">Save draft</button>'+
-    '<button class="btn-submit-card" id="scb-'+eid+'" onclick="submitCard('+J(a.id)+')">Submit to Sheets →</button>'+
+    '<button class="btn-save-card" data-id="'+eid+'" onclick="saveDraftBtn(this)">Save draft</button>'+
+    '<button class="btn-submit-card" id="scb-'+eid+'" data-id="'+eid+'" onclick="submitCardBtn(this)">Submit to Sheets →</button>'+
     '</div></div></div>';
 }
 
 // ── INTERACTIONS ───────────────────────────────────────────────
-function toggleExpand(id){
-  var a=getApp(id); if (!a) return;
-  var ne=document.getElementById('notes-'+escId(id)); if (ne) a.notes=ne.value;
+function toggleExpand(btn){
+  var eid=btn.dataset.id;
+  var a=apps.find(function(x){return escId(x.id)===eid;}); if (!a) return;
+  var ne=document.getElementById('notes-'+eid); if (ne) a.notes=ne.value;
   a.expanded=!a.expanded;
-  var panel=document.getElementById('panel-'+escId(id));
-  var btn=document.getElementById('rb-'+escId(id));
-  if (a.expanded){panel.innerHTML=panelHTML(a);panel.style.display='block';if(btn){btn.textContent='Reviewing';btn.classList.add('open');}}
-  else{panel.style.display='none';panel.innerHTML='';if(btn){btn.textContent='Review';btn.classList.remove('open');}}
+  var panel=document.getElementById('panel-'+eid);
+  var rb=document.getElementById('rb-'+eid);
+  if (a.expanded){panel.innerHTML=panelHTML(a);panel.style.display='block';if(rb){rb.textContent='Reviewing';rb.classList.add('open');}}
+  else{panel.style.display='none';panel.innerHTML='';if(rb){rb.textContent='Review';rb.classList.remove('open');}}
 }
 
-function assignTo(id,member){
-  var a=getApp(id); if (!a) return;
-  a.assignedTo=a.assignedTo===member?'':member;
-  var mc=document.getElementById('mc-'+escId(id));
-  if (mc) mc.innerHTML=TEAM.map(function(m){return '<button class="mchip'+(a.assignedTo===m?' sel':'')+'" onclick="assignTo('+J(id)+','+J(m)+')">'+m+'</button>';}).join('');
-  var ad=document.getElementById('ad-'+escId(id));
+function assignTo(eid, member){
+  var a=apps.find(function(x){return escId(x.id)===eid;}); if (!a) return;
+  a.assignedTo=member;
+  var ad=document.getElementById('ad-'+eid);
   if (ad) ad.innerHTML=a.assignedTo?'Assigned: <strong>'+a.assignedTo+'</strong>':'<span style="color:var(--fail-text);font-weight:600">Unassigned</span>';
+}
+
+function setGateBtn(btn){
+  var eid=btn.dataset.id, gid=btn.dataset.gid, val=btn.dataset.val;
+  var a=apps.find(function(x){return escId(x.id)===eid;}); if (!a) return;
+  setGate(a.id, gid, val);
+}
+
+function setRatingBtn(btn){
+  var eid=btn.dataset.id, rid=btn.dataset.rid, val=parseInt(btn.dataset.val);
+  var a=apps.find(function(x){return escId(x.id)===eid;}); if (!a) return;
+  setRating(a.id, rid, val);
+}
+
+function saveDraftBtn(btn){
+  var eid=btn.dataset.id;
+  var a=apps.find(function(x){return escId(x.id)===eid;}); if (!a) return;
+  saveDraft(a.id);
+}
+
+function submitCardBtn(btn){
+  var eid=btn.dataset.id;
+  var a=apps.find(function(x){return escId(x.id)===eid;}); if (!a) return;
+  submitCard(a.id);
 }
 
 function setGate(id,gid,val){
@@ -1047,9 +1086,9 @@ function setGate(id,gid,val){
     el.className='ep-gate'+(a.editedGates.has(gid)?' edited':'');
     el.innerHTML='<div class="epg-top"><span class="epg-name">'+(GATES.find(function(g){return g.id===gid;})||{label:gid}).label+'</span>'+
       '<div class="pill-grp">'+
-      '<button class="epill'+(val==='pass'?' sp':'')+'" onclick="setGate('+J(id)+',\''+gid+'\',\'pass\')">Pass</button>'+
-      '<button class="epill'+(val==='fail'?' sf':'')+'" onclick="setGate('+J(id)+',\''+gid+'\',\'fail\')">Fail</button>'+
-      '<button class="epill'+(val==='flag'?' sfl':'')+'" onclick="setGate('+J(id)+',\''+gid+'\',\'flag\')">Flag</button>'+
+      '<button class="epill'+(val==='pass'?' sp':'')+'" data-id="'+escId(id)+'" data-gid="'+gid+'" data-val="pass" onclick="setGateBtn(this)">Pass</button>'+
+      '<button class="epill'+(val==='fail'?' sf':'')+'" data-id="'+escId(id)+'" data-gid="'+gid+'" data-val="fail" onclick="setGateBtn(this)">Fail</button>'+
+      '<button class="epill'+(val==='flag'?' sfl':'')+'" data-id="'+escId(id)+'" data-gid="'+gid+'" data-val="flag" onclick="setGateBtn(this)">Flag</button>'+
       '</div></div>'+
       '<div class="epg-note">'+(a.aiGates[gid]&&a.aiGates[gid].note||'')+'</div>'+
       (a.editedGates.has(gid)?'<div class="edited-flag">Reviewer changed: '+(a.aiGates[gid]&&a.aiGates[gid].verdict)+' → '+val+'</div>':'');
@@ -1068,7 +1107,9 @@ function setRating(id,rid,val){
   (val!==a.aiRatings[rid])?a.editedRatings.add(rid):a.editedRatings.delete(rid);
   a.humanScore=calcScore(a.humanGates,a.humanRatings);
   var st=document.getElementById('st-'+escId(id)+'-'+rid);
-  if (st) st.innerHTML=[1,2,3,4,5].map(function(n){return '<div class="star'+(val>=n?' on':'')+'" onclick="setRating('+J(id)+',\''+rid+'\','+n+')">'+n+'</div>';}).join('');
+  if (st) st.innerHTML=[1,2,3,4,5].map(function(n){
+    return '<div class="star'+(val>=n?' on':'')+'" data-id="'+escId(id)+'" data-rid="'+rid+'" data-val="'+n+'" onclick="setRatingBtn(this)">'+n+'</div>';
+  }).join('');
   var ra=document.getElementById('ra-'+escId(id)+'-'+rid);
   if (ra){var adj=a.editedRatings.has(rid);ra.className='rat-ai'+(adj?' adj':'');ra.textContent='AI: '+a.aiRatings[rid]+'/5'+(adj?' · adj':'');}
   liveUpdate(id,a); updateSummary();
