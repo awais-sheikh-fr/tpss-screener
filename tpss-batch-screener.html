@@ -898,13 +898,13 @@ async function screenOne(row) {
         await new Promise(function(r){setTimeout(r, waitMs);});
       }
       resp = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + encodeURIComponent(geminiKey),
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=' + encodeURIComponent(geminiKey),
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
+            generationConfig: { temperature: 0.2, maxOutputTokens: 2048 }
           })
         }
       );
@@ -1120,9 +1120,14 @@ function panelHTML(a){
   // Applicant responses from spreadsheet
   var fields=a.rawFields||{};
   var fieldRows=Object.keys(fields).filter(function(k){return fields[k];}).map(function(k){
+    var val=fields[k];
+    // Make Pitch Deck a clickable link
+    if (k==='Pitch Deck' && val && (val.indexOf('http')=== 0 || val.indexOf('www')===0)) {
+      val='<a href="'+val+'" target="_blank" style="color:var(--cyan);word-break:break-all">'+val+'</a>';
+    }
     return '<div style="margin-bottom:10px">'+
       '<div style="font-size:10px;font-weight:700;color:var(--text2);font-family:\'Montserrat\',sans-serif;letter-spacing:.04em;text-transform:uppercase;margin-bottom:3px">'+k+'</div>'+
-      '<div style="font-size:12px;color:var(--text);line-height:1.6">'+fields[k]+'</div>'+
+      '<div style="font-size:12px;color:var(--text);line-height:1.6">'+val+'</div>'+
       '</div>';
   }).join('<hr style="border:none;border-top:1px solid var(--border);margin:10px 0">');
 
