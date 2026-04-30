@@ -614,19 +614,25 @@ function doOptions(e) {
 
 <script>
 const TEAM=['Salah','Ismail','Fawwaz','Awais','Sahil','Cassandra','Faisal'];
+// Stage 0 eligibility gates (pass/fail/flag)
 const GATES=[
-  {id:'stage',label:'Venture stage'},
-  {id:'ummah',label:'Ummah alignment'},
-  {id:'compliance',label:'Islamic compliance'},
-  {id:'team',label:'Team credibility'},
-  {id:'viability',label:'Viability & financials'},
+  {id:'maqasid',    label:'Maqasid alignment'},
+  {id:'compliance', label:'Islamic compliance'},
+  {id:'stage',      label:'Venture stage'},
+  {id:'type',       label:'Venture type'},
   {id:'availability',label:'Finals availability'}
 ];
+
+// TPSS 100-point rubric categories (scored 1-5, weighted to 100)
 const RATINGS=[
-  {id:'ummah',label:'Ummah impact'},
-  {id:'stage',label:'Stage clarity'},
-  {id:'team',label:'Team strength'},
-  {id:'viability',label:'Viability & financials'}
+  {id:'mission_alignment', label:'Mission alignment',  weight:20},
+  {id:'ummah_impact',      label:'Ummah impact',       weight:15},
+  {id:'problem_solution',  label:'Problem & solution', weight:10},
+  {id:'team',              label:'Team & execution',   weight:15},
+  {id:'traction',          label:'Traction & evidence',weight:10},
+  {id:'viability',         label:'Viability & finance',weight:20},
+  {id:'scalability',       label:'Scalability',        weight:5},
+  {id:'risk_governance',   label:'Risk & governance',  weight:5}
 ];
 
 let apps=[], appFilter='all', sortBy='score-desc';
@@ -867,22 +873,36 @@ async function screenOne(row) {
   var aName=(g('First Name')+' '+g('Last Name')).trim();
 
   // Compact prompt to stay within GET URL length limits (~6KB safe zone)
-  var prompt='TPSS Stage 0 screener. Return ONLY valid JSON, no markdown, no special characters in strings, no apostrophes, use simple words only.\n'+
+  var prompt='You are a TPSS Accelerator Stage 0 screener. Evaluate this venture against the official TPSS scoring rubric. Return ONLY valid JSON, no markdown, no special characters in strings, no apostrophes.\n\n'+
     'VENTURE:'+vName+' APPLICANT:'+aName+' COUNTRY:'+g('Country')+'\n'+
     'SECTOR:'+g('Venture Sector')+' STAGE:'+g('Venture Stage')+' TYPE:'+g('Venture Type')+'\n'+
-    'DESC:'+g('Venture Description').slice(0,300)+'\n'+
+    'DESC:'+g('Venture Description').slice(0,250)+'\n'+
     'MISSION:'+g('Venture Mission').slice(0,200)+'\n'+
     'MAQASID:'+g('Maqasid Alignment')+'\n'+
     'PROBLEM:'+g('Problem Statement').slice(0,200)+'\n'+
     'SOLUTION:'+g('Venture Solution').slice(0,200)+'\n'+
     'TRACTION:'+g('Current Traction')+' '+g('Traction Examples').slice(0,150)+'\n'+
     'TEAM:'+(g('Cofounders')||g('Cofounder Details')).slice(0,150)+'\n'+
-    'FUNDING:'+g('Funding Source')+' ASK:'+g('Funding Amount')+'\n'+
-    'COMMIT:'+g('Commit')+'\n'+
-    'Gates verdict pass/fail/flag:\n'+
-    '1.stage: PoC or stronger? 2.ummah: Muslim/Maqasid alignment? 3.compliance: No haram/riba? 4.team: Named founders? 5.viability: Credible fit and ask? 6.availability: Confirmed for finals?\n'+
-    'Return this exact JSON structure with short plain notes (no apostrophes, no quotes inside strings):\n'+
-    '{"gates":{"stage":{"verdict":"pass","note":"one sentence"},"ummah":{"verdict":"pass","note":"one sentence"},"compliance":{"verdict":"pass","note":"one sentence"},"team":{"verdict":"pass","note":"one sentence"},"viability":{"verdict":"pass","note":"one sentence"},"availability":{"verdict":"pass","note":"one sentence"}},"ratings":{"ummah":3,"stage":3,"team":3,"viability":3},"summary":"two sentence plain text summary"}';
+    'FUNDING:'+g('Funding Source')+' ASK:'+g('Funding Amount')+' USE:'+g('Funds Use').slice(0,100)+'\n'+
+    'IMPACT:'+g('Venture Impact').slice(0,150)+'\n'+
+    'COMMIT:'+g('Commit')+'\n\n'+
+    'STAGE 0 ELIGIBILITY GATES (pass/fail/flag each):\n'+
+    '1. maqasid: Mission fit with TPSS principles and Maqasid al-Shariah. Screens out non-permissible activities.\n'+
+    '2. compliance: No prohibited sectors, no riba-dependent revenue, Islamic governance integrity.\n'+
+    '3. stage: Proof-of-concept or stronger (small reserve for exceptional concept-stage). Pass if PoC+, flag if concept-only but strong.\n'+
+    '4. type: For-profit or nonprofit accepted, tech or non-tech accepted.\n'+
+    '5. availability: Able to participate in finals and coaching windows per TPSS 2026 calendar.\n\n'+
+    'TPSS 100-POINT RUBRIC - score each 1-5 (1=poor,3=adequate,5=excellent):\n'+
+    '1. mission_alignment (20pts): TPSS mission fit, Maqasid alignment, service to Ummah, ethical governance.\n'+
+    '2. ummah_impact (15pts): Theory of change, beneficiary scale, concrete outcome metrics, measurement plan.\n'+
+    '3. problem_solution (10pts): Problem clarity, solution differentiation, innovation edge over alternatives.\n'+
+    '4. team (15pts): Founder-market fit, track record, ability to recruit and deliver.\n'+
+    '5. traction (10pts): PoC, pilots, users, revenue, donations, letters of support.\n'+
+    '6. viability (20pts): For-profits: unit economics, market size, path to profitability, capital efficiency. Nonprofits: multi-year funding and sustainability plan. Preference for Islamic instruments.\n'+
+    '7. scalability (5pts): Ability to scale across markets, build generational institutions.\n'+
+    '8. risk_governance (5pts): Risk register, governance, safeguarding, data protection, Shariah readiness.\n\n'+
+    'Return this exact JSON (no apostrophes in notes, plain words only):\n'+
+    '{"gates":{"maqasid":{"verdict":"pass","note":"one sentence"},"compliance":{"verdict":"pass","note":"one sentence"},"stage":{"verdict":"pass","note":"one sentence"},"type":{"verdict":"pass","note":"one sentence"},"availability":{"verdict":"pass","note":"one sentence"}},"scores":{"mission_alignment":3,"ummah_impact":3,"problem_solution":3,"team":3,"traction":3,"viability":3,"scalability":3,"risk_governance":3},"summary":"two sentence plain text assessment"}';
 
   var ai;
   try {
@@ -946,7 +966,8 @@ async function screenOne(row) {
 
   var humanGates={};
   GATES.forEach(function(g2){humanGates[g2.id]=ai.gates[g2.id]&&ai.gates[g2.id].verdict||'flag';});
-  var aiScore=calcScore(humanGates,ai.ratings);
+  var aiScores=ai.scores||{};
+  var aiScore=calcScore(humanGates,aiScores);
 
   return {
     id:(g('Email')||vName).toLowerCase().trim(),
@@ -978,8 +999,8 @@ async function screenOne(row) {
     aiGates:JSON.parse(JSON.stringify(ai.gates)),
     humanGates:humanGates,
     editedGates:new Set(),
-    aiRatings:Object.assign({},ai.ratings),
-    humanRatings:Object.assign({},ai.ratings),
+    aiRatings:Object.assign({},aiScores),
+    humanRatings:Object.assign({},aiScores),
     editedRatings:new Set(),
     aiScore:aiScore, humanScore:aiScore,
     aiSummary:ai.summary||'',
@@ -992,9 +1013,19 @@ async function screenOne(row) {
 // ── SCORING ────────────────────────────────────────────────────
 function gp(v){return v==='pass'?10:v==='flag'?5:0;}
 function calcScore(gates,ratings){
-  var g=0; GATES.forEach(function(x){g+=gp(gates[x.id]||'fail');});
-  var r=0; RATINGS.forEach(function(x){r+=(ratings[x.id]||3);});
-  return Math.min(100,g+Math.round((r/(RATINGS.length*5))*40));
+  // Gates: any fail = cap score at 50, any flag = cap at 75
+  var hasFail=Object.values(gates).some(function(v){return v==='fail';});
+  var hasFlag=Object.values(gates).some(function(v){return v==='flag';});
+  // Weighted rubric score (max 100)
+  var rubricScore=0;
+  RATINGS.forEach(function(r){
+    var val=ratings[r.id]||3;
+    rubricScore+=Math.round((val/5)*r.weight);
+  });
+  rubricScore=Math.min(100,rubricScore);
+  if (hasFail) return Math.min(rubricScore,50);
+  if (hasFlag) return Math.min(rubricScore,75);
+  return rubricScore;
 }
 function computeVerdict(gates){
   var vs=Object.values(gates);
@@ -1110,11 +1141,11 @@ function panelHTML(a){
   }).join('');
 
   var ratRows=RATINGS.map(function(r){
-    var hv=a.humanRatings[r.id]||1; var av=a.aiRatings[r.id]||1; var adj=a.editedRatings.has(r.id);
+    var hv=a.humanRatings[r.id]||3; var av=a.aiRatings[r.id]||3; var adj=a.editedRatings.has(r.id);
     var stars=[1,2,3,4,5].map(function(n){
       return '<div class="star'+(hv>=n?' on':'')+'" data-id="'+eid+'" data-rid="'+r.id+'" data-val="'+n+'" onclick="setRatingBtn(this)">'+n+'</div>';
     }).join('');
-    return '<div class="rat-row"><span class="rlbl">'+r.label+'</span><div class="stars" id="st-'+eid+'-'+r.id+'">'+stars+'</div><span class="rat-ai'+(adj?' adj':'')+'" id="ra-'+eid+'-'+r.id+'">AI: '+av+'/5'+(adj?' · adj':'')+'</span></div>';
+    return '<div class="rat-row"><span class="rlbl">'+r.label+' <span style="color:var(--text3);font-weight:400">('+r.weight+'pts)</span></span><div class="stars" id="st-'+eid+'-'+r.id+'">'+stars+'</div><span class="rat-ai'+(adj?' adj':'')+'" id="ra-'+eid+'-'+r.id+'">AI: '+av+'/5'+(adj?' · adj':'')+'</span></div>';
   }).join('');
 
   // Applicant responses from spreadsheet
